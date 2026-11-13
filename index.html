@@ -9,7 +9,7 @@
 <style>
   :root{--bg:#0c0e14;--panel:#141722;--card:#1c2030;--border:#2a3147;--primary:#ff7700;--gold:#FFD700;--success:#10b981;--danger:#ef4444;--info:#0ea5e9;--text:#f8fafc;--muted:#94a3b8;--radius:10px}
   *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-tap-highlight-color:transparent}
-  body{background:var(--bg);color:var(--text);min-height:100vh;padding:12px 12px 130px}
+  body{background:var(--bg);color:var(--text);min-height:100vh;padding:12px 12px 58px}
   h1{color:var(--gold);text-align:center;font-size:1.15rem;margin-bottom:4px;text-shadow:0 0 12px rgba(255,215,0,.4)}
   .subtitle{text-align:center;font-size:.72rem;color:var(--muted);margin-bottom:12px}
   .tabs{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px}
@@ -31,10 +31,12 @@
   .card-stock.low{color:var(--danger);font-weight:800}
   .pending-badge{position:absolute;top:-6px;right:-6px;background:var(--danger);color:#fff;font-size:.65rem;font-weight:900;padding:2px 7px;border-radius:12px;box-shadow:0 2px 6px rgba(239,68,68,.5)}
   
-  .bottom-bar{position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-top:2px solid var(--border);padding:10px 12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;box-shadow:0 -4px 20px rgba(0,0,0,.5);z-index:999}
-  .big-btn{border:none;padding:18px 8px;border-radius:12px;font-weight:900;font-size:.95rem;cursor:pointer;color:#fff;display:flex;flex-direction:column;align-items:center;gap:4px;transition:transform .1s;line-height:1.1}
+  /* Point 11 : barre compacte, deux petits boutons sur une seule ligne */
+  .bottom-bar{position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-top:2px solid var(--border);padding:5px 8px;display:grid;grid-template-columns:1fr 1fr;gap:6px;box-shadow:0 -4px 20px rgba(0,0,0,.5);z-index:999}
+  .big-btn{border:none;padding:7px 6px;border-radius:8px;font-weight:800;font-size:.72rem;cursor:pointer;color:#fff;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:5px;transition:transform .1s;line-height:1.1;min-height:34px}
   .big-btn:active{transform:scale(.96)}
-  .big-btn .icon{font-size:1.5rem;line-height:1}
+  .big-btn .icon{font-size:1rem;line-height:1}
+  .big-btn span:last-child{display:none}
   .big-btn.send{background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 4px 20px rgba(16,185,129,.4)}
   .big-btn.pull{background:linear-gradient(135deg,#0ea5e9,#0369a1);box-shadow:0 4px 20px rgba(14,165,233,.4)}
   .big-btn:disabled{opacity:.5;cursor:not-allowed}
@@ -425,6 +427,7 @@
         <button class="btn-cancel" style="padding:11px;border-radius:9px;border:1px solid var(--border);font-weight:900" onclick="removeMobilePin()">🗑️ Supprimer le PIN</button>
       </div>
       <button class="btn-cancel" style="width:100%;padding:10px;border-radius:9px;border:1px solid var(--warning);color:var(--warning);font-weight:900;margin-top:8px" onclick="lockMobileApp()">🔒 Verrouiller maintenant</button>
+      <div class="field-note" style="margin-top:6px;color:var(--warning)">Le PIN protège seulement l'ouverture de l'application. Les remises et changements de prix restent suspendus jusqu'à validation explicite sur le PC.</div>
     </div>
     <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px">
       <h3 style="color:var(--gold);font-size:.95rem;margin-bottom:8px">👆 Empreinte / Biométrie</h3>
@@ -894,6 +897,16 @@ function mergeProducts(list) {
 }
 
 /* ---------- CHARGEMENT LIVE (dossier sync prioritaire, fetch ensuite) ---------- */
+function liveStampOf(data) {
+  if (!data) return '';
+  const base = data.lastUpdate || data.sentAt || data.updatedAt || data.generatedAt;
+  if (base) return String(base);
+  if (!Array.isArray(data.products)) return '';
+  const s = data.products.map(p => [p.code || p.barcode || '', p.stock, p.sellPrice, p.alertThreshold, p.expiryDate].join(':')).join('|');
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return 'h' + (h >>> 0).toString(16) + 'n' + data.products.length;
+}
 async function loadLiveFile() {
   try {
     let data = null;
@@ -925,6 +938,9 @@ async function loadLiveFile() {
     // Point 08 : ventes PC récentes (affichées en lecture seule, sans doublon avec les ventes mobile)
     if (Array.isArray(data.recentSales)) pcSalesCache = data.recentSales;
     localStorage.setItem('ssk_mobile_last_sync', new Date().toISOString());
+    // Point 10 : mémorise la version LIVE chargée pour détecter le prochain changement PC.
+    const liveStamp = liveStampOf(data);
+    if (liveStamp) lastLiveNotifiedStamp = liveStamp;
     saveLocal();
     setStatus('🟢 ' + products.length + ' articles synchronisés', 'ok');
     renderProducts();
@@ -1030,16 +1046,14 @@ function resolveConfirm(value) {
 }
 function closeModalBg(id) { const el = document.getElementById(id); if (el) el.classList.remove('active'); }
 
-/* ---------- POP-UP CHANGEMENT DE PRIX ---------- */
-function askPriceChange(productName, oldPrice, newPrice) {
-  return new Promise(resolve => {
-    priceChangeResolver = resolve;
-    document.getElementById('price-change-message').innerHTML =
-      `Vous allez changer le prix de <b style="color:var(--gold)">${escapeHtml(productName)}</b><br>` +
-      `de <b>${Number(oldPrice).toFixed(2)} DZD</b> à <b>${Number(newPrice).toFixed(2)} DZD</b>.<br><br>` +
-      `Confirmez-vous ce changement ?`;
-    document.getElementById('modal-price-change').classList.add('active');
-  });
+/* ---------- POP-UP CHANGEMENT DE PRIX (validation PC obligatoire) ---------- */
+async function askPriceChange(productName, oldPrice, newPrice) {
+  const local = await confirmDialog('💸 Changement de prix',
+    `Vous allez changer le prix de <b style="color:var(--gold)">${escapeHtml(productName)}</b><br>` +
+    `de <b>${Number(oldPrice).toFixed(2)} DZD</b> à <b>${Number(newPrice).toFixed(2)} DZD</b>.<br><br>` +
+    `Le changement doit être validé sur le PC avant d'être appliqué.`);
+  if (!local) return false;
+  return await waitForPcApproval('PRIX', productName, newPrice, `Prix ${Number(oldPrice).toFixed(2)} → ${Number(newPrice).toFixed(2)} DZD`);
 }
 function resolvePriceChange(value) {
   document.getElementById('modal-price-change').classList.remove('active');
@@ -1139,6 +1153,24 @@ async function writeSyncBlob(filename, blob) {
       }
     }
   }
+  // Point 10 : quand la page est ouverte via le serveur du PC (QR), on écrit directement au PC.
+  if ((location.protocol === 'http:' || location.protocol === 'https:') && !syncDirHandle) {
+    try {
+      const text = await blob.text();
+      const r = await fetch('/ssk-write', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file: filename, content: text })
+      });
+      if (r.ok) {
+        const j = await r.json().catch(() => ({}));
+        if (j && j.ok) {
+          setStatus('✅ ' + filename + ' envoyé au PC (WiFi)', 'ok');
+          return { ok: true, mode: 'http' };
+        }
+      }
+    } catch (e) { console.warn('writeSyncBlob HTTP:', e); }
+  }
   downloadBlob(filename, blob);
   setStatus('✅ ' + filename + ' téléchargé (dossier sync non choisi)', 'info');
   return { ok: true, mode: 'download' };
@@ -1160,12 +1192,19 @@ async function readSyncFile(filename) {
 }
 
 /* ---------- RÉGLAGES DOSSIER SYNC ---------- */
+function isMobileServerMode() {
+  return location.protocol === 'http:' || location.protocol === 'https:';
+}
 function showSyncFolderState() {
   const el = document.getElementById('sync-folder-state');
   if (el) {
-    el.innerHTML = syncFolderName
-      ? '✅ Dossier choisi : <b style="color:var(--success)">' + escapeHtml(syncFolderName) + '</b><br><span style="color:var(--muted)">Ventes / Produits / Factures / Achats seront écrits directement ici.</span>'
-      : '⚠️ Aucun dossier choisi. Les fichiers iront dans Téléchargements.';
+    if (isMobileServerMode()) {
+      el.innerHTML = '✅ Connecté au PC par WiFi.<br><span style="color:var(--muted)">Lecture et écriture directes des fichiers de synchronisation sur le PC. Aucun dossier à choisir.</span>';
+    } else {
+      el.innerHTML = syncFolderName
+        ? '✅ Dossier choisi : <b style="color:var(--success)">' + escapeHtml(syncFolderName) + '</b><br><span style="color:var(--muted)">Ventes / Produits / Factures / Achats seront écrits directement ici.</span>'
+        : '⚠️ Aucun dossier choisi. Les fichiers iront dans Téléchargements.';
+    }
   }
   const btn = document.getElementById('btn-sync-folder');
   if (btn) {
@@ -1762,17 +1801,36 @@ function onFactureTypeChange() {
 }
 function onFacturePriceManual() { /* le prix saisi reste utilis\u00e9 tel quel */ }
 
-function addFactureLine() {
+async function addFactureLine() {
   const hidden = document.getElementById('f-prod-select');
   let prod = selectedFactureProduct;
   if (!prod && hidden && hidden.value) prod = products.find(p => String(p.code) === String(hidden.value));
   if (!prod) { alert('S\u00e9lectionnez un article dans la liste.'); return; }
   const type = document.getElementById('f-line-type').value || 'detail';
   const qty = parseFloat(document.getElementById('f-line-qty').value) || 1;
+  const autoPrice = factureUnitPrice(prod, type);
   let price = parseFloat(document.getElementById('f-line-price').value) || 0;
-  if (price <= 0) price = factureUnitPrice(prod, type);
+  if (price <= 0) price = autoPrice;
+  // Point 09 : tout prix saisi différent du prix catalogue doit être validé sur le PC.
+  if (Math.abs(price - autoPrice) > 0.001) {
+    const approvedPrice = await waitForPcApproval('PRIX', prod.code || prod.name, price,
+      `Prix ${prod.name} : ${autoPrice.toFixed(2)} → ${price.toFixed(2)} DZD`);
+    if (!approvedPrice) {
+      setStatus('⏸️ Prix non appliqué — validation PC requise', 'info');
+      return;
+    }
+  }
   let remise = parseFloat(document.getElementById('f-line-remise').value) || 0;
   if (remise < 0) remise = 0; if (remise > 100) remise = 100;
+  if (remise > 0) {
+    // Point 09 : la remise reste suspendue jusqu'à l'accord explicite du PC.
+    const discountAmount = price * (remise / 100) * qty;
+    const approved = await waitForPcApproval('REMISE', prod.code || prod.name, discountAmount, `Remise ${remise}% sur ${prod.name} (${qty} × ${price.toFixed(2)} DZD)`);
+    if (!approved) {
+      setStatus('⏸️ Remise non appliquée — validation PC requise', 'info');
+      return;
+    }
+  }
   const net = price * (1 - remise / 100);
 
   const existing = factureLines.find(l => String(l.code) === String(prod.code) && l.type === type && Number(l.remise) === remise && Math.abs(Number(l.unitPrice) - price) < 0.001);
@@ -2903,7 +2961,7 @@ async function checkApprovalResponse(manual) {
     renderMobileStatusBlock();
     return;
   }
-  const same = (data.id != null && String(data.id) === String(last.id)) || (data.ref && last.ref && String(data.ref) === String(last.ref));
+  const same = approvalResponseMatches(data, last);
   if (!same) { if (manual) setStatus('La réponse reçue ne correspond pas à la dernière demande', 'info'); return; }
   localStorage.setItem('ssk_mobile_approval_response', JSON.stringify(data));
   const label = data.approved ? '✅ Approuvée' : '❌ Refusée';
@@ -2919,7 +2977,8 @@ function renderApprovalStatus() {
   const el = document.getElementById('mobile-approval-status');
   if (!el) return;
   const last = getLastApprovalRequest();
-  const resp = getStoredApprovalResponse();
+  const storedResp = getStoredApprovalResponse();
+  const resp = (storedResp && approvalResponseMatches(storedResp, last)) ? storedResp : null;
   if (!last) { el.innerHTML = '📲 Aucune demande d\'approbation envoyée.'; return; }
   let state = '⏳ en attente du PC';
   let color = 'var(--warning)';
@@ -2928,6 +2987,66 @@ function renderApprovalStatus() {
     color = resp.approved ? 'var(--success)' : 'var(--danger)';
   }
   el.innerHTML = '📲 ' + escapeHtml(last.type || 'Demande') + (last.ref ? ' #' + escapeHtml(last.ref) : '') + (last.amount ? ' — ' + p2Money(last.amount) : '') + ' : <b style="color:' + color + '">' + state + '</b>';
+}
+
+/* ---------- POINT 09 : AUCUNE MODIFICATION SENSIBLE SANS ACCORD DU PC ---------- */
+function approvalResponseMatches(data, last) {
+  if (!data || !last) return false;
+  // Priorité absolue à l'identifiant unique : une ancienne réponse avec le même
+  // code article ne doit jamais approuver une nouvelle demande.
+  if (data.id != null && String(data.id) !== '') return String(data.id) === String(last.id);
+  return !!(data.ref && last.ref && String(data.ref) === String(last.ref));
+}
+async function fetchApprovalResponse(last) {
+  let data = null;
+  const viaSync = await readSyncFile('SSK-APPROVAL-RESPONSE.json');
+  if (viaSync && viaSync.data) data = viaSync.data;
+  if (!data) {
+    try {
+      const r = await fetch(APPROVAL_RESPONSE_PATH + '?t=' + Date.now(), { cache: 'no-store' });
+      if (r.ok) data = await r.json();
+    } catch (e) { /* PC injoignable */ }
+  }
+  if (!data) return null;
+  return approvalResponseMatches(data, last) ? data : null;
+}
+async function waitForPcApproval(type, ref, amount, message) {
+  const req = {
+    id: 'APR-' + Date.now(),
+    type: type || 'AUTRE',
+    ref: ref || '',
+    amount: Number(amount) || 0,
+    message: message || '',
+    date: new Date().toISOString(),
+    source: 'MOBILE'
+  };
+  localStorage.setItem('ssk_mobile_last_approval', JSON.stringify(req));
+  localStorage.removeItem('ssk_mobile_approval_response');
+  lastApprovalSentId = req.id;
+  approvalResponseNotifiedId = null;
+  try {
+    await writeSyncFile('SSK-APPROVAL-MOBILE.json', { version: 'SSK-POS-V8-APPROVAL', stamp: req.date, request: req });
+  } catch (e) {
+    setStatus('❌ Envoi de la demande au PC impossible', 'error');
+    return false;
+  }
+  addJournal('APPROBATION', 'Demande ' + req.type + ' envoyée au PC' + (req.ref ? ' — ' + req.ref : ''), req);
+  renderMobileStatusBlock();
+  setStatus('⏳ Changement suspendu — en attente de validation sur le PC…', 'info');
+  const deadline = Date.now() + 180000; // 3 minutes
+  while (Date.now() < deadline) {
+    const data = await fetchApprovalResponse(req);
+    if (data) {
+      localStorage.setItem('ssk_mobile_approval_response', JSON.stringify(data));
+      renderMobileStatusBlock();
+      setStatus(data.approved ? '✅ PC : modification approuvée' : '❌ PC : modification refusée', data.approved ? 'ok' : 'error');
+      return !!data.approved;
+    }
+    await new Promise(resolve => setTimeout(resolve, 2500));
+  }
+  setStatus('⏱️ Toujours en attente du PC — modification non appliquée', 'error');
+  renderMobileStatusBlock();
+  return false;
 }
 
 /* ---------- NOTIFICATIONS INSTANTANÉES ---------- */
@@ -2960,13 +3079,20 @@ function renderNotificationState() {
 }
 async function pollMobileNotifications() {
   try {
-    const r = await fetch(LIVE_PATH + '?t=' + Date.now(), { cache: 'no-store' });
-    if (r.ok) {
-      const data = await r.json();
-      const stamp = data.sentAt || data.updatedAt || data.generatedAt || (Array.isArray(data.products) ? 'n' + data.products.length : '');
+    let data = null;
+    const syncRead = await readSyncFile('SSK-POS-LIVE.json');
+    if (syncRead && syncRead.data) data = syncRead.data;
+    if (!data) {
+      const r = await fetch(LIVE_PATH + '?t=' + Date.now(), { cache: 'no-store' });
+      if (r.ok) data = await r.json();
+    }
+    if (data) {
+      const stamp = liveStampOf(data);
       if (stamp && lastLiveNotifiedStamp && stamp !== lastLiveNotifiedStamp) {
         mobileNotify('🔄 Mise à jour du magasin', (Array.isArray(data.products) ? data.products.length + ' articles' : 'Données reçues') + ' — ' + new Date().toLocaleTimeString('fr-FR'));
         addJournal('SYNC', 'Nouvelle version LIVE détectée', { stamp });
+        // Point 10 : applique immédiatement les changements PC (stock, prix, articles).
+        await loadLiveFile();
       }
       if (stamp) lastLiveNotifiedStamp = stamp;
     }
@@ -3155,11 +3281,14 @@ function renderMobileStatusBlock() {
   const lines = document.getElementById('mobile-status-lines');
   if (lines) {
     const lastSync = localStorage.getItem('ssk_mobile_last_sync');
+    const lastSyncTxt = lastSync
+      ? new Date(lastSync).toLocaleString('fr-FR')
+      : (products.length ? 'cache local — synchronisation PC en attente' : 'aucune donnée — vérifiez le dossier sync');
     const pending = pendingUpdates.reduce((a, u) => a + (Number(u.addQty) || 0), 0);
     const invSent = localStorage.getItem('ssk_inventory_sent_at');
     lines.innerHTML =
       '🟢 <b>' + products.length + '</b> article(s) • ⏳ <b>' + pending + '</b> unité(s) en attente<br>' +
-      '🕒 Dernière synchro : ' + (lastSync ? new Date(lastSync).toLocaleString('fr-FR') : '—') + '<br>' +
+      '🕒 Dernière synchro : ' + lastSyncTxt + '<br>' +
       '📷 Inventaire : ' + (inventoryCounts.length ? inventoryCounts.length + ' compté(s)' : 'vide') + (invSent ? ' • envoyé ' + new Date(invSent).toLocaleTimeString('fr-FR') : '') + '<br>' +
       '🔔 Notifications : ' + (('Notification' in window) ? Notification.permission : 'non supportées');
   }
@@ -3208,13 +3337,19 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (catBox) { catBox.style.display = 'none'; catBox.innerHTML = ''; }
 
   await restoreSyncHandle();
-  if (!syncFolderName && !syncFolderDeferred) {
+  // Point 10 : en mode serveur PC (QR/WiFi), aucune fenêtre de dossier ne doit bloquer l'ouverture.
+  if (!isMobileServerMode() && !syncFolderName && !syncFolderDeferred) {
     showSyncFolderState();
     document.getElementById('modal-sync-folder').classList.add('active');
   }
 
   if (products.length === 0) { loadLiveFile(); }
   else { setStatus('🟢 ' + products.length + ' articles (cache local)', 'ok'); loadLiveFile(); }
+
+  // Point 08 : synchronisation automatique 3 secondes après l'ouverture, sans aucun clic.
+  setTimeout(() => { loadLiveFile().catch(() => {}); }, 3000);
+  // Puis rafraîchissement automatique régulier pour rester lié au fichier LIVE du PC.
+  setInterval(() => { loadLiveFile().catch(() => {}); }, 60000);
 });
 </script>
 </body>
