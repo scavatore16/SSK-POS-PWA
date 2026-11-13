@@ -125,6 +125,45 @@
   .logo-preview{width:44px;height:44px;border-radius:8px;border:1px solid var(--border);background:#0f121a;display:flex;align-items:center;justify-content:center;color:var(--gold);font-weight:900;overflow:hidden;flex-shrink:0}
   .logo-preview img{width:100%;height:100%;object-fit:contain}
 
+  /* ============================================================
+     V9 — TÉLÉPHONE : champs pleine largeur, aucun scroll horizontal
+  ============================================================ */
+  html,body{max-width:100%;overflow-x:hidden}
+  .space-row,.space-row3{grid-template-columns:1fr}
+  @media (min-width:600px){
+    .space-row{grid-template-columns:1fr 1fr}
+    .space-row3{grid-template-columns:1fr 1fr 1fr}
+  }
+  input,select,textarea{min-width:0;max-width:100%}
+  .form-group{min-width:0}
+  .list-row{flex-wrap:wrap}
+  .search-bar{flex-wrap:nowrap}
+  /* Clavier PIN gros chiffres */
+  .pin-dots{font-size:2rem;letter-spacing:10px;text-align:center;color:var(--gold);min-height:44px;margin-bottom:8px;user-select:none}
+  .pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:320px;margin:0 auto 10px}
+  .pin-pad button{background:var(--card);border:1px solid var(--border);color:var(--text);font-size:1.5rem;font-weight:900;padding:14px 0;border-radius:12px;cursor:pointer}
+  .pin-pad button:active{background:var(--primary);border-color:var(--primary)}
+  /* Facture : TOTAL fixe toujours visible */
+  .facture-total-bar{position:fixed;left:8px;right:6px;bottom:8px;z-index:800;max-width:540px;margin:0 auto;background:var(--panel);border:1px solid var(--primary);border-radius:12px;padding:10px;box-shadow:0 -6px 20px rgba(0,0,0,.65)}
+  #view-facture{padding-bottom:210px}
+  .facture-total-bar .tt-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:5px 0;font-size:.8rem}
+  .facture-total-bar .tt-row label{color:var(--muted);font-size:.72rem;white-space:nowrap}
+  .facture-total-bar .tt-row input{flex:1;max-width:140px;padding:8px;font-size:.9rem;text-align:right}
+  .facture-total-bar .tt-grand{font-size:1rem;font-weight:900;color:var(--primary);border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:6px}
+  /* Achat : total en haut + boutons +/- */
+  .achat-total{background:rgba(255,119,0,.12);border:1px solid var(--primary);border-radius:10px;padding:9px 10px;margin-bottom:10px;text-align:center;font-weight:900;color:var(--primary);font-size:.95rem}
+  .qty-step{display:grid;grid-template-columns:46px 1fr 46px;gap:6px;align-items:stretch}
+  .qty-step button{background:var(--card);border:1px solid var(--border);color:var(--gold);font-size:1.2rem;font-weight:900;border-radius:8px;cursor:pointer}
+  .qty-step button:active{background:var(--primary);color:#fff}
+  /* Historique : filtres rapides */
+  .quick-filters{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+  .quick-filters button{padding:9px 4px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-weight:800;font-size:.72rem;cursor:pointer}
+  .quick-filters button.active{background:var(--primary);border-color:var(--primary);color:#fff}
+  /* Inventaire : écart en couleur */
+  .diff-up{color:#4ade80;font-weight:900}
+  .diff-down{color:#f87171;font-weight:900}
+  .diff-zero{color:var(--muted);font-weight:900}
+
   .confirm-box .modal{max-width:380px}
   .yesno{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
   .yesno button{padding:13px;border-radius:10px;border:none;font-weight:900;font-size:.9rem;cursor:pointer}
@@ -166,14 +205,17 @@
 </head>
 <body>
 
-  <h1>📱 SSK-POS Mobile V8</h1>
-  <div class="subtitle">Télécommande & Boutique</div>
-  <div class="top-tools">
-    <button class="folder-btn" id="btn-sync-folder" onclick="openSyncSettings()">📁 Dossier Sync</button>
-    <button class="folder-btn" onclick="openShopSettings()">🏪 Infos Magasin</button>
+  <!-- SPLASH 2 SECONDES : puis synchro automatique, aucun clic -->
+  <div id="mobile-splash" style="position:fixed;inset:0;z-index:10000;background:#0b0e14;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px">
+    <div style="font-size:2.6rem;text-shadow:0 0 18px rgba(255,215,0,.5)">📱</div>
+    <div style="color:var(--gold);font-weight:900;font-size:1.1rem">SSK-POS Mobile V8</div>
+    <div id="splash-text" style="color:var(--muted);font-size:.8rem">Synchronisation en cours...</div>
   </div>
 
-  <div class="status" id="status">Recherche du fichier LIVE...</div>
+  <h1>📱 SSK-POS Mobile V8</h1>
+  <div class="subtitle">Télécommande & Boutique</div>
+
+  <div class="status" id="status">⏳ Connexion au PC...</div>
   <div id="pending-info" class="pending-info" style="display:none"></div>
 
   <div class="tabs">
@@ -184,6 +226,7 @@
     <button class="tab" onclick="switchView('credit', this)">💰 Crédit</button>
     <button class="tab" onclick="switchView('inventaire', this)">📷 Inventaire</button>
     <button class="tab" onclick="switchView('securite', this)">🔐 Sécurité</button>
+    <button class="tab" onclick="switchView('parametres', this)">⚙️ Paramètres</button>
   </div>
 
   <!-- VIEW STOCK -->
@@ -197,17 +240,13 @@
     </div>
     <!-- POINT 11 : ALERTE STOCK BAS AVANT ZÉRO -->
     <div id="mobile-lowstock-banner" style="display:none;background:rgba(239,68,68,.12);border:1px solid var(--danger);border-radius:10px;padding:9px 10px;margin-bottom:10px;font-size:.72rem;line-height:1.5"></div>
-    <!-- PARTIE 2 : ÉTAT SYNC / APPROBATION DISTANTE -->
+    <!-- PARTIE 2 : REMISE DISTANTE (auto-vérifiée toutes les 5 s) -->
     <div id="mobile-status-block" style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px;margin-bottom:10px;font-size:.7rem;line-height:1.55">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
         <b style="color:var(--info)">🔗 Liaison PC</b>
-        <button class="btn-cancel" style="padding:4px 8px;border-radius:8px;font-size:.64rem;border:1px solid var(--border)" onclick="requestNotificationPermission()">🔔 Notifications</button>
+        <button class="btn-cancel" id="btn-notif-top" style="padding:4px 8px;border-radius:8px;font-size:.64rem;border:1px solid var(--border)" onclick="requestNotificationPermission()">🔔 Notifications</button>
       </div>
-      <div id="mobile-status-lines" style="color:var(--muted);margin-top:5px">—</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px">
-        <button class="btn-confirm" style="padding:7px 9px;border-radius:8px;font-size:.68rem" onclick="openApprovalRequest()">📲 Demander approbation</button>
-        <button class="btn-cancel" style="padding:7px 9px;border-radius:8px;font-size:.68rem;border:1px solid var(--border)" onclick="checkApprovalResponse(true)">🔄 Vérifier réponse</button>
-      </div>
+      <button class="btn-confirm" style="width:100%;padding:10px;border-radius:9px;font-size:.78rem;font-weight:900;margin-top:8px" onclick="openApprovalRequest()">📲 Demander Remise</button>
       <div id="mobile-approval-status" style="margin-top:6px;font-size:.68rem;color:var(--muted)"></div>
     </div>
     <div class="search-bar">
@@ -220,8 +259,9 @@
   <div id="view-achat" class="view-content" style="display:none">
     <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
       <h3 style="color:var(--gold);font-size:1rem;margin-bottom:10px">🛒 Nouvel Achat (Camion / Fournisseur)</h3>
+      <div class="achat-total" id="a-total-top">Total achat : 0.00 DZD</div>
       <div class="form-group"><label>Désignation *</label><input type="text" id="a-designation" placeholder="Ex: Lait Candia 1L"></div>
-      
+
       <!-- SCAN BARCODE ACHAT -->
       <div class="form-group">
         <label>Code-barres (optionnel)</label>
@@ -229,28 +269,27 @@
           <input type="text" id="a-code" placeholder="EAN-13 ou code interne" oninput="onAchatCodeChanged()">
           <button class="scan-btn" onclick="openScanner('a-code')" title="Scanner avec caméra">📷</button>
         </div>
-        <div class="field-note">Scannez : le produit existant s'affiche avant confirmation (point 07).</div>
       </div>
 
       <div id="a-product-info" class="selected-info"></div>
 
-      <div class="space-row">
-        <div class="form-group"><label>Qté *</label><input type="number" id="a-qte" value="1" min="1"></div>
-        <div class="form-group"><label>Catégorie</label><input type="text" id="a-categorie" placeholder="Alimentation" oninput="renderAchatCategoryList()" onfocus="renderAchatCategoryList()"></div>
+      <div class="form-group">
+        <label>Qté *</label>
+        <div class="qty-step">
+          <button type="button" onclick="stepAchatQty(-1)">−</button>
+          <input type="number" id="a-qte" value="1" min="1" inputmode="numeric" oninput="updateAchatTotal()">
+          <button type="button" onclick="stepAchatQty(1)">＋</button>
+        </div>
       </div>
+      <div class="form-group"><label>Catégorie</label><input type="text" id="a-categorie" placeholder="Alimentation" oninput="renderAchatCategoryList()" onfocus="renderAchatCategoryList()"></div>
       <div id="a-category-list" class="list-panel"></div>
-      <div class="space-row3">
-        <div class="form-group"><label>P. Achat HT *</label><input type="number" id="a-pachat" value="0" step="0.5"></div>
-        <div class="form-group"><label>P. Vente TTC *</label><input type="number" id="a-pvente" value="0" step="0.5" oninput="syncAchatDemiGrosPlaceholder()"></div>
-        <div class="form-group"><label>P. Demi-gros TTC</label><input type="number" id="a-demigros" value="" step="0.5" placeholder="= P. Vente"></div>
-      </div>
-      <div class="field-note" style="margin-top:-4px;margin-bottom:8px">P. Demi-gros optionnel : si vide, il sera égal au P. Vente TTC (point 08).</div>
-      <div class="space-row3">
-        <div class="form-group"><label>P. Gros TTC</label><input type="number" id="a-pgros" value="0" step="0.5"></div>
-        <div class="form-group"><label>TVA (%)</label><input type="number" id="a-tva" value="19" step="0.5"></div>
-        <div class="form-group"><label>Fournisseur</label><input type="text" id="a-fournisseur" placeholder="Grossiste El Eulma"></div>
-      </div>
-      <button class="btn-confirm" style="width:100%;padding:14px;margin-top:8px" onclick="addAchatToList()">➕ Ajouter à la liste</button>
+      <div class="form-group"><label>P. Achat HT *</label><input type="number" id="a-pachat" value="0" step="0.5" oninput="updateAchatTotal()"></div>
+      <div class="form-group"><label>P. Vente TTC *</label><input type="number" id="a-pvente" value="0" step="0.5" oninput="syncAchatDemiGrosPlaceholder()"></div>
+      <input type="hidden" id="a-demigros" value="">
+      <input type="hidden" id="a-pgros" value="0">
+      <input type="hidden" id="a-tva" value="19">
+      <input type="hidden" id="a-fournisseur" value="">
+      <button class="btn-confirm" style="display:block;width:auto;margin-left:auto;padding:9px 14px;font-size:.78rem;font-weight:900;border-radius:8px" onclick="addAchatToList()">➕ Ajouter à la liste</button>
     </div>
 
     <h3 style="color:var(--text);font-size:.9rem;margin-bottom:8px;display:none" id="achat-list-title">Articles à envoyer</h3>
@@ -300,42 +339,26 @@
         <div class="form-group" style="display:flex;align-items:flex-end"><button class="btn-confirm" style="width:100%;padding:11px" onclick="addFactureLine()">➕ Ajouter</button></div>
       </div>
       <div id="facture-lines"></div>
-      <div style="display:flex;justify-content:space-between;padding-top:8px;font-weight:900;font-size:.95rem;color:var(--primary)">
-        <span>TOTAL GÉNÉRAL:</span><span id="facture-total">0.00 DZD</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:.7rem;color:var(--muted);margin-top:3px">
-        <span id="facture-ht">HT: 0.00</span><span id="facture-tva">TVA: 0.00</span>
-      </div>
     </div>
 
-    <!-- FORMAT & ENVOI PDF -->
+    <!-- TOTAL GÉNÉRAL FIXE : toujours visible + remise + rendu monnaie -->
+    <div class="facture-total-bar" id="facture-total-bar">
+      <div class="tt-row tt-grand"><span>TOTAL GÉNÉRAL</span><span id="facture-total">0.00 DZD</span></div>
+      <div class="tt-row"><label>Remise facture (%)</label><input type="number" id="f-global-remise" value="0" min="0" max="100" step="0.5" inputmode="decimal" oninput="onFactureGlobalRemise()"></div>
+      <div class="tt-row"><label>Montant donné</label><input type="number" id="f-amount-given" value="" min="0" step="0.5" inputmode="decimal" placeholder="0.00" oninput="renderFactureChange()"></div>
+      <div class="tt-row"><span>Rendu monnaie</span><span id="facture-change" style="font-weight:900;color:#4ade80">0.00 DZD</span></div>
+      <div class="tt-row" style="font-size:.7rem;color:var(--muted)"><span id="facture-ht">HT: 0.00</span><span id="facture-tva">TVA: 0.00</span></div>
+    </div>
+
+    <!-- ENVOI PDF & PARTAGE -->
     <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px">
       <div style="font-size:.8rem;color:var(--muted);font-weight:700;margin-bottom:7px;text-align:center">📄 Facture PDF & partage</div>
-      <div class="invoice-format-row">
-        <button class="fmt-btn active" id="fmt-a4" onclick="setInvoiceFormat('A4')">📄 A4</button>
-        <button class="fmt-btn" id="fmt-a5" onclick="setInvoiceFormat('A5')">📄 A5</button>
-      </div>
-      <div class="logo-row">
-        <div class="logo-preview" id="logo-preview">🏪</div>
-        <div style="flex:1;font-size:.68rem;color:var(--muted)">Logo du magasin (optionnel)<br><span id="logo-name">Aucun logo</span></div>
-        <button class="btn btn-sm" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:8px;font-weight:800" onclick="document.getElementById('logo-input').click()">Choisir</button>
-        <input type="file" id="logo-input" accept="image/*" style="display:none" onchange="onLogoSelected(event)">
-      </div>
       <div class="pdf-actions">
         <button class="btn-print" onclick="printInvoice()">🖨️ Imprimer Bluetooth</button>
         <button class="btn-pdf" onclick="downloadInvoicePdf()">⬇️ Télécharger PDF</button>
       </div>
-      <div class="share-grid-5">
-        <button class="share-btn share-wa" onclick="sendFactureVia('whatsapp')"><span class="ic">💬</span><span>WhatsApp</span></button>
-        <button class="share-btn share-ms" onclick="sendFactureVia('messenger')"><span class="ic">💌</span><span>Messenger</span></button>
-        <button class="share-btn share-vb" onclick="sendFactureVia('viber')"><span class="ic">📞</span><span>Viber</span></button>
-        <button class="share-btn share-tg" onclick="sendFactureVia('telegram')"><span class="ic">✈️</span><span>Telegram</span></button>
-        <button class="share-btn share-em" onclick="sendFactureVia('email')"><span class="ic">✉️</span><span>Email</span></button>
-      </div>
-      <div class="save-row">
-        <button class="big-btn" style="background:var(--card);border:1px solid var(--border)" onclick="saveFacture()">💾 Enregistrer</button>
-        <button class="big-btn send" onclick="saveAndExportFacture()">📤 Envoyer & Sauvegarder</button>
-      </div>
+      <button class="share-btn share-wa" style="width:100%;flex-direction:row;margin-top:8px;padding:12px" onclick="sendFactureVia('whatsapp')"><span class="ic">💬</span><span>WhatsApp</span></button>
+      <button class="big-btn send" style="width:100%;margin-top:10px;padding:15px;font-size:1rem" onclick="validerEtEnvoyerFacture()">✅ Valider & Envoyer au PC</button>
     </div>
   </div>
 
@@ -348,23 +371,24 @@
     </div>
 
     <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px;margin-bottom:10px">
-      <div style="font-size:.8rem;font-weight:900;color:var(--gold);margin-bottom:7px">🔍 Retrouver une ancienne vente</div>
-      <div class="space-row">
-        <div class="form-group"><label>N° Ticket</label><input type="text" id="h-ticket" placeholder="F-..." oninput="renderMobileHistory()"></div>
-        <div class="form-group"><label>Produit</label><input type="text" id="h-product" placeholder="Nom ou code" oninput="renderMobileHistory()"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:7px">
+        <div style="font-size:.8rem;font-weight:900;color:var(--gold)">🔍 Rechercher une vente</div>
+        <div id="m-history-today-total" style="font-size:.72rem;font-weight:900;color:#4ade80">Total du jour : 0.00 DZD</div>
       </div>
-      <div class="space-row">
-        <div class="form-group"><label>Montant (DZD)</label><input type="number" id="h-amount" step="0.5" placeholder="Ex: 450" oninput="renderMobileHistory()"></div>
-        <div class="form-group"><label>Heure / Date</label><input type="text" id="h-time" placeholder="14:35 ou 2026-11-08" oninput="renderMobileHistory()"></div>
+      <div class="search-bar" style="margin-bottom:8px">
+        <input type="text" id="h-search" placeholder="Ticket, produit, client, montant..." oninput="renderMobileHistory()">
       </div>
-      <button class="btn-cancel" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);font-weight:900" onclick="resetMobileHistoryFilters()">♻️ Réinitialiser</button>
+      <div class="quick-filters">
+        <button type="button" id="hq-today" onclick="setHistoryRange('today')">Aujourd'hui</button>
+        <button type="button" id="hq-yesterday" onclick="setHistoryRange('yesterday')">Hier</button>
+        <button type="button" id="hq-week" onclick="setHistoryRange('week')">Cette semaine</button>
+      </div>
     </div>
 
     <div class="list-panel">
       <div class="list-title"><span>📜 Historique des ventes</span><span id="m-history-count">0</span></div>
       <div class="list-scroll" id="mobile-history-list"></div>
     </div>
-    <div class="field-note" style="margin-top:6px">L'historique ne se supprime jamais : un retour ajoute une opération inverse (stock + caisse + journal).</div>
   </div>
 
   <!-- VIEW CRÉDIT / DETTES (point 09) -->
@@ -372,6 +396,9 @@
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <h3 style="color:var(--gold);font-size:.95rem">💰 Clients qui doivent</h3>
       <span id="m-credit-total" style="font-size:.75rem;font-weight:900;color:var(--danger)"></span>
+    </div>
+    <div class="search-bar">
+      <input type="text" id="credit-search" placeholder="🔍 Rechercher un client..." oninput="renderCreditView()">
     </div>
     <div class="list-panel">
       <div class="list-title"><span>👤 Dettes en cours</span><span id="m-credit-count">0</span></div>
@@ -381,7 +408,6 @@
       <div class="list-title"><span>🧾 Derniers règlements</span><span></span></div>
       <div class="list-scroll" id="credit-history-list"></div>
     </div>
-    <div class="field-note" style="margin-top:6px">Le règlement (partiel ou total) réduit la dette et écrit une trace. Le PC reçoit tout via SSK-CREDIT-MOBILE.json.</div>
   </div>
 
   <!-- VIEW INVENTAIRE PAR SCAN (P0) -->
@@ -408,40 +434,39 @@
     </div>
     <div style="display:grid;gap:8px;margin-top:10px">
       <button class="btn-confirm" style="padding:13px;border-radius:10px;font-weight:900" onclick="sendInventoryToPC()">📤 Envoyer l'inventaire au PC</button>
-      <button class="btn-cancel" style="padding:10px;border-radius:10px;border:1px solid var(--border);font-weight:800" onclick="clearInventoryCounts()">🗑️ Vider le comptage</button>
     </div>
-    <div class="field-note" style="margin-top:6px">Le PC applique le comptage via SSK-INVENTAIRE-MOBILE.json (Stock ➜ 📷 Inventaire mobile).</div>
+    <div style="margin-top:24px;padding-top:14px;border-top:1px dashed var(--border)">
+      <button class="btn-cancel" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);font-weight:800" onclick="clearInventoryCounts()">🗑️ Vider le comptage</button>
+    </div>
   </div>
 
-  <!-- VIEW SÉCURITÉ : PIN / BIOMÉTRIE (P0) -->
+  <!-- VIEW SÉCURITÉ : PIN UNIQUEMENT (P0) -->
   <div id="view-securite" class="view-content" style="display:none">
     <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px">
       <h3 style="color:var(--gold);font-size:.95rem;margin-bottom:8px">🔐 Code PIN de l'application</h3>
       <div id="pin-state" style="font-size:.74rem;color:var(--muted);margin-bottom:8px">—</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div class="form-group" style="margin:0"><label>Nouveau PIN (4-8 chiffres)</label><input type="password" id="pin-new" inputmode="numeric" maxlength="8" placeholder="••••"></div>
-        <div class="form-group" style="margin:0"><label>Confirmer le PIN</label><input type="password" id="pin-confirm" inputmode="numeric" maxlength="8" placeholder="••••"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px">
-        <button class="btn-confirm" style="padding:11px;border-radius:9px;font-weight:900" onclick="saveMobilePin()">💾 Enregistrer le PIN</button>
-        <button class="btn-cancel" style="padding:11px;border-radius:9px;border:1px solid var(--border);font-weight:900" onclick="removeMobilePin()">🗑️ Supprimer le PIN</button>
+      <div class="form-group"><label>Nouveau PIN (4-8 chiffres)</label><input type="password" id="pin-new" inputmode="numeric" maxlength="8" placeholder="••••" autocomplete="new-password" style="font-size:1.6rem;text-align:center;letter-spacing:8px;padding:14px"></div>
+      <div class="form-group"><label>Confirmer le PIN</label><input type="password" id="pin-confirm" inputmode="numeric" maxlength="8" placeholder="••••" autocomplete="new-password" style="font-size:1.6rem;text-align:center;letter-spacing:8px;padding:14px"></div>
+      <div class="yesno" style="margin-top:4px">
+        <button class="no" style="padding:11px;border-radius:9px;font-weight:900" onclick="removeMobilePin()">🗑️ Supprimer le PIN</button>
+        <button class="yes" style="padding:11px;border-radius:9px;font-weight:900" onclick="saveMobilePin()">💾 Enregistrer</button>
       </div>
       <button class="btn-cancel" style="width:100%;padding:10px;border-radius:9px;border:1px solid var(--warning);color:var(--warning);font-weight:900;margin-top:8px" onclick="lockMobileApp()">🔒 Verrouiller maintenant</button>
-      <div class="field-note" style="margin-top:6px;color:var(--warning)">Le PIN protège seulement l'ouverture de l'application. Les remises et changements de prix restent suspendus jusqu'à validation explicite sur le PC.</div>
-    </div>
-    <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px">
-      <h3 style="color:var(--gold);font-size:.95rem;margin-bottom:8px">👆 Empreinte / Biométrie</h3>
-      <div id="bio-state" style="font-size:.74rem;color:var(--muted);margin-bottom:8px">—</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <button class="btn-confirm" style="padding:11px;border-radius:9px;font-weight:900" onclick="registerBiometrics()">👆 Activer</button>
-        <button class="btn-cancel" style="padding:11px;border-radius:9px;border:1px solid var(--border);font-weight:900" onclick="removeBiometrics()">Désactiver</button>
-      </div>
-      <div class="field-note" style="margin-top:6px">Utilise l'authentification de l'appareil (WebAuthn). Le PIN reste disponible en secours.</div>
     </div>
     <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px">
       <h3 style="color:var(--gold);font-size:.95rem;margin-bottom:8px">🔔 Notifications instantanées</h3>
       <div id="notif-state" style="font-size:.74rem;color:var(--muted);margin-bottom:8px">—</div>
-      <button class="btn-confirm" style="width:100%;padding:11px;border-radius:9px;font-weight:900" onclick="requestNotificationPermission()">Activer les notifications</button>
+      <button class="btn-confirm" id="btn-notif-enable" style="width:100%;padding:11px;border-radius:9px;font-weight:900" onclick="requestNotificationPermission()">Activer les notifications</button>
+    </div>
+  </div>
+
+  <!-- VIEW PARAMÈTRES : dossier sync + infos magasin -->
+  <div id="view-parametres" class="view-content" style="display:none">
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px">
+      <h3 style="color:var(--gold);font-size:.95rem;margin-bottom:8px">⚙️ Paramètres</h3>
+      <button class="btn-confirm" style="width:100%;padding:12px;border-radius:10px;font-weight:900;margin-bottom:8px" onclick="openSyncSettings()">📁 Dossier Sync (SSK-POS-DATA)</button>
+      <button class="btn-confirm" style="width:100%;padding:12px;border-radius:10px;font-weight:900" onclick="openShopSettings()">🏪 Infos Magasin</button>
+      <div id="param-sync-state" style="font-size:.7rem;color:var(--muted);margin-top:10px;line-height:1.5"></div>
     </div>
   </div>
 
@@ -500,16 +525,30 @@
     </div>
   </div>
 
-  <!-- ÉCRAN DE VERROUILLAGE PIN / BIOMÉTRIE -->
-  <div id="mobile-lock-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:#0b0e14;padding:24px;align-items:center;justify-content:center">
+  <!-- ÉCRAN DE VERROUILLAGE PIN (CLAVIER TÉLÉPHONE) -->
+  <div id="mobile-lock-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:#0b0e14;padding:24px;align-items:center;justify-content:center;overflow-y:auto">
     <div style="width:100%;max-width:340px;text-align:center">
       <div style="font-size:2.4rem;margin-bottom:4px">🔐</div>
       <h2 style="color:var(--gold);font-size:1.05rem;margin-bottom:4px">SSK-POS Mobile</h2>
-      <div style="color:var(--muted);font-size:.75rem;margin-bottom:14px">Entrez votre code PIN</div>
-      <input type="password" id="lock-pin" inputmode="numeric" maxlength="8" placeholder="••••" style="width:100%;font-size:1.5rem;text-align:center;letter-spacing:8px;padding:14px;background:#0f121a;border:1px solid var(--border);color:var(--text);border-radius:10px">
-      <div id="lock-error" style="color:var(--danger);font-size:.72rem;min-height:18px;margin-top:6px"></div>
-      <button class="btn-confirm" style="width:100%;padding:13px;border-radius:10px;font-weight:900;margin-top:6px" onclick="unlockMobileApp()">🔓 Déverrouiller</button>
-      <button class="btn-cancel" id="lock-bio-btn" style="display:none;width:100%;padding:11px;border-radius:10px;border:1px solid var(--border);font-weight:900;margin-top:8px" onclick="unlockWithBiometrics()">👆 Empreinte / Biométrie</button>
+      <div style="color:var(--muted);font-size:.75rem;margin-bottom:12px">Entrez votre code PIN</div>
+      <input type="hidden" id="lock-pin" value="">
+      <div class="pin-dots" id="lock-dots">• • • •</div>
+      <div class="pin-pad">
+        <button type="button" onclick="pinKey('1')">1</button>
+        <button type="button" onclick="pinKey('2')">2</button>
+        <button type="button" onclick="pinKey('3')">3</button>
+        <button type="button" onclick="pinKey('4')">4</button>
+        <button type="button" onclick="pinKey('5')">5</button>
+        <button type="button" onclick="pinKey('6')">6</button>
+        <button type="button" onclick="pinKey('7')">7</button>
+        <button type="button" onclick="pinKey('8')">8</button>
+        <button type="button" onclick="pinKey('9')">9</button>
+        <button type="button" onclick="pinClear()" style="color:var(--warning)">C</button>
+        <button type="button" onclick="pinKey('0')">0</button>
+        <button type="button" onclick="pinBack()">⌫</button>
+      </div>
+      <div id="lock-error" style="color:var(--danger);font-size:.72rem;min-height:18px;margin-top:2px"></div>
+      <button class="btn-confirm" style="width:100%;padding:14px;border-radius:10px;font-weight:900;font-size:1rem;margin-top:4px" onclick="unlockMobileApp()">🔓 Déverrouiller</button>
     </div>
   </div>
 
@@ -648,7 +687,6 @@
         Choisissez une autre solution :
       </div>
       <div style="display:grid;gap:8px">
-        <button class="btn-confirm" style="padding:13px" onclick="fallbackEmailInvoice()">✉️ Envoyer par Email</button>
         <button class="btn-pdf" style="padding:13px;border-radius:10px" onclick="fallbackDownloadInvoice()">⬇️ Télécharger le PDF</button>
         <button class="no" style="padding:10px;border-radius:10px;background:var(--card);color:var(--text);border:1px solid var(--border);font-weight:800" onclick="closeModalBg('modal-app-fallback')">❌ Annuler</button>
       </div>
@@ -680,7 +718,6 @@ const APPROVAL_PATH = '../SSK-BACKUP/SSK-APPROVAL-MOBILE.json';
 const APPROVAL_RESPONSE_PATH = '../SSK-BACKUP/SSK-APPROVAL-RESPONSE.json';
 const MOBILE_PIN_KEY = 'ssk_mobile_pin_hash';
 const MOBILE_PIN_ENABLED_KEY = 'ssk_mobile_pin_enabled';
-const MOBILE_BIO_KEY = 'ssk_mobile_bio_id';
 const INVENTORY_KEY = 'ssk_mobile_inventory_counts';
 const MOBILE_SALES_KEY = 'ssk_mobile_v8_sales';
 const UNDO_WINDOW_MS = 5 * 60 * 1000; // Point 01 : Undo = 5 minutes
@@ -907,42 +944,108 @@ function liveStampOf(data) {
   for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
   return 'h' + (h >>> 0).toString(16) + 'n' + data.products.length;
 }
-async function loadLiveFile() {
+/* ============================================================
+   SYNCHRO LIVE — LECTURE SEULE
+   - auto au démarrage (splash 2 s), puis toutes les 5 s
+   - anti-cache ?t=Date.now()
+   - 3 essais espacés de 2 s si le PC écrit le fichier
+   - reconnexion automatique (online / retour au premier plan)
+   - UNE seule ligne : 🟢 Connecté / 🔴 Déconnecté - Dernière synchro : HH:MM
+============================================================ */
+let syncState = {
+  connected: false,
+  lastSyncAt: localStorage.getItem('ssk_mobile_last_sync') || null,
+  inFlight: false,
+  failures: 0
+};
+let statusTimer = null;
+let livePollTimer = null;
+
+function syncClockText(iso) {
+  if (!iso) return '--:--';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '--:--';
+  return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+function renderStatusLine() {
+  const el = document.getElementById('status');
+  if (!el) return;
+  el.textContent = (syncState.connected ? '🟢 Connecté' : '🔴 Déconnecté') + ' - Dernière synchro : ' + syncClockText(syncState.lastSyncAt);
+  el.className = 'status' + (syncState.connected ? '' : ' error');
+}
+function setStatus(msg, type) {
+  const el = document.getElementById('status');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'status';
+  if (type === 'error') el.classList.add('error');
+  if (type === 'info') el.classList.add('info');
+  if (statusTimer) clearTimeout(statusTimer);
+  statusTimer = setTimeout(renderStatusLine, 4000);
+}
+
+async function readLiveOnce() {
+  // 1) Dossier sync choisi une seule fois (lecture seule)
+  const syncRead = await readSyncFile('SSK-POS-LIVE.json');
+  if (syncRead && syncRead.data) return syncRead.data;
+  // 2) Fichier LIVE du PC — anti-cache obligatoire
+  const resp = await fetch(LIVE_PATH + '?t=' + Date.now(), { cache: 'no-store' });
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  return await resp.json();
+}
+
+async function readLiveWithRetry() {
+  let lastErr = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const data = await readLiveOnce();
+      if (data && typeof data === 'object') return data;
+      lastErr = new Error('Réponse vide');
+    } catch (e) { lastErr = e; }
+    // Le PC peut être en train d'écrire le fichier : attendre 2 s et réessayer
+    if (attempt < 2) await new Promise(r => setTimeout(r, 2000));
+  }
+  throw lastErr || new Error('LIVE inaccessible');
+}
+
+function applyLiveData(data) {
+  if (data.products && Array.isArray(data.products)) products = mergeProducts(data.products);
+  if (data.customers && Array.isArray(data.customers)) {
+    customers = data.customers.map(c => ({ ...c, credit: num(c.credit) }));
+  }
+  // Infos magasin (NIF/NIS/RC/AI) reçues du PC — mêmes données sur la facture
+  if (data.shop) {
+    const map = { name: 'ssk_shop_name', phone: 'ssk_shop_phone', addr: 'ssk_shop_addr', nif: 'ssk_shop_nif', nis: 'ssk_shop_nis', rc: 'ssk_shop_rc', ai: 'ssk_shop_ai' };
+    Object.keys(map).forEach(k => {
+      const v = data.shop[k];
+      if (v && !localStorage.getItem(map[k])) localStorage.setItem(map[k], String(v));
+      if (v && k === 'name') localStorage.setItem('cfg_shop_name', String(v));
+    });
+  }
+  if (data.dailySummary && typeof data.dailySummary === 'object') dailySummaryCache = data.dailySummary;
+  if (Array.isArray(data.lowStock)) lowStockCache = data.lowStock;
+  if (Array.isArray(data.recentSales)) pcSalesCache = data.recentSales;
+}
+
+async function loadLiveFile(opts) {
+  const silent = !!(opts && opts.silent);
+  if (syncState.inFlight) return null;
+  syncState.inFlight = true;
   try {
-    let data = null;
-    const syncRead = await readSyncFile('SSK-POS-LIVE.json');
-    if (syncRead && syncRead.data) data = syncRead.data;
-    if (!data) {
-      const resp = await fetch(LIVE_PATH + '?t=' + Date.now());
-      if (!resp.ok) throw new Error('Fichier LIVE introuvable');
-      data = await resp.json();
+    const data = await readLiveWithRetry();
+    applyLiveData(data);
+    const stamp = liveStampOf(data);
+    // Notification temps réel : la version du fichier LIVE a changé côté PC
+    if (stamp && lastLiveNotifiedStamp && stamp !== lastLiveNotifiedStamp) {
+      mobileNotify('🔄 Mise à jour du magasin', (Array.isArray(data.products) ? data.products.length + ' articles' : 'Données reçues') + ' — ' + new Date().toLocaleTimeString('fr-FR'));
+      addJournal('SYNC', 'Nouvelle version LIVE reçue', { stamp });
     }
-    if (data.products && Array.isArray(data.products)) {
-      products = mergeProducts(data.products);
-    }
-    if (data.customers && Array.isArray(data.customers)) {
-      customers = data.customers.map(c => ({ ...c, credit: num(c.credit) }));
-    }
-    // Point 08 : infos magasin (NIF/NIS/RC/AI) reçues du PC — mêmes données sur la facture A4/A5
-    if (data.shop) {
-      const map = { name: 'ssk_shop_name', phone: 'ssk_shop_phone', addr: 'ssk_shop_addr', nif: 'ssk_shop_nif', nis: 'ssk_shop_nis', rc: 'ssk_shop_rc', ai: 'ssk_shop_ai' };
-      Object.keys(map).forEach(k => {
-        const v = data.shop[k];
-        if (v && !localStorage.getItem(map[k])) localStorage.setItem(map[k], String(v));
-        if (v && k === 'name') localStorage.setItem('cfg_shop_name', String(v));
-      });
-    }
-    // Points 10 & 11 : résumé du jour + alertes stock calculés par le PC
-    if (data.dailySummary && typeof data.dailySummary === 'object') dailySummaryCache = data.dailySummary;
-    if (Array.isArray(data.lowStock)) lowStockCache = data.lowStock;
-    // Point 08 : ventes PC récentes (affichées en lecture seule, sans doublon avec les ventes mobile)
-    if (Array.isArray(data.recentSales)) pcSalesCache = data.recentSales;
-    localStorage.setItem('ssk_mobile_last_sync', new Date().toISOString());
-    // Point 10 : mémorise la version LIVE chargée pour détecter le prochain changement PC.
-    const liveStamp = liveStampOf(data);
-    if (liveStamp) lastLiveNotifiedStamp = liveStamp;
+    if (stamp) lastLiveNotifiedStamp = stamp;
+    syncState.connected = true;
+    syncState.failures = 0;
+    syncState.lastSyncAt = new Date().toISOString();
+    localStorage.setItem('ssk_mobile_last_sync', syncState.lastSyncAt);
     saveLocal();
-    setStatus('🟢 ' + products.length + ' articles synchronisés', 'ok');
     renderProducts();
     renderFactureClientSelect();
     renderFactureProductList();
@@ -952,37 +1055,44 @@ async function loadLiveFile() {
     renderMobileHistory();
     renderInventoryView();
     renderMobileStatusBlock();
+    renderStatusLine();
     return data;
   } catch (e) {
-    setStatus('⚠️ Fichier LIVE inaccessible — utilisez "🔄 Mettre à jour"', 'error');
+    // Jamais de message technique : uniquement la ligne d'état
+    syncState.connected = false;
+    syncState.failures++;
+    renderStatusLine();
     return null;
+  } finally {
+    syncState.inFlight = false;
   }
 }
 
-function setStatus(msg, type) {
-  const el = document.getElementById('status');
-  el.textContent = msg;
-  el.className = 'status';
-  if (type === 'error') el.classList.add('error');
-  if (type === 'info') el.classList.add('info');
+function startLivePolling() {
+  if (livePollTimer) return;
+  livePollTimer = setInterval(async () => {
+    await loadLiveFile({ silent: true });
+    checkApprovalResponse(false).catch(() => {});
+  }, 5000);
 }
 
 /* ---------- NAVIGATION ENTRE VUES ---------- */
 function switchView(name, btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
-  ['stock','achat','facture','history','credit','inventaire','securite'].forEach(v => {
+  ['stock','achat','facture','history','credit','inventaire','securite','parametres'].forEach(v => {
     const el = document.getElementById('view-' + v);
     if (el) el.style.display = (v === name) ? 'block' : 'none';
   });
   document.getElementById('bottom-bar-stock').style.display = (name === 'stock') ? 'grid' : 'none';
   if (name === 'facture') { renderFactureClientSelect(); renderFactureProductList(); renderFactureLines(); }
-  if (name === 'achat') { renderAchatList(); renderAchatCategoryList(); }
+  if (name === 'achat') { renderAchatList(); renderAchatCategoryList(); updateAchatTotal(); }
   if (name === 'stock') { renderDailySummary(); renderLowStockBanner(); renderMobileStatusBlock(); }
   if (name === 'history') { renderUndoSaleBlock(); renderMobileHistory(); }
   if (name === 'credit') { renderCreditView(); }
   if (name === 'inventaire') { renderInventoryView(); }
   if (name === 'securite') { renderSecurityView(); }
+  if (name === 'parametres') { renderParametres(); }
 }
 
 /* ---------- STOCK (liste compacte sombre — point 10) ---------- */
@@ -991,7 +1101,7 @@ function renderProducts() {
   const filtered = currentSearch ? products.filter(p => p.name.toLowerCase().includes(currentSearch) || String(p.code).includes(currentSearch)) : products;
   grid.className = 'list-panel';
   grid.style.display = 'block';
-  if (filtered.length === 0) { grid.innerHTML = '<div class="list-empty">Aucun article trouvé.<br>Cliquez sur "🔄 Mettre à jour" en bas.</div>'; return; }
+  if (filtered.length === 0) { grid.innerHTML = '<div class="list-empty">Aucun article trouvé.</div>'; return; }
   let html = '<div class="list-title"><span>📦 Articles</span><span>' + filtered.length + '</span></div><div class="list-scroll">';
   filtered.forEach(p => {
     const pending = pendingUpdates.find(u => u.code === p.code);
@@ -1145,7 +1255,7 @@ async function writeSyncBlob(filename, blob) {
         const w = await fh.createWritable();
         await w.write(blob);
         await w.close();
-        setStatus('✅ ' + filename + ' écrit dans « ' + (syncFolderName || syncDirHandle.name || 'dossier sync') + ' »', 'ok');
+        setStatus('✅ Envoyé au PC', 'ok');
         return { ok: true, mode: 'folder' };
       } catch (e) {
         console.warn('writeSyncBlob:', e);
@@ -1165,14 +1275,14 @@ async function writeSyncBlob(filename, blob) {
       if (r.ok) {
         const j = await r.json().catch(() => ({}));
         if (j && j.ok) {
-          setStatus('✅ ' + filename + ' envoyé au PC (WiFi)', 'ok');
+          setStatus('✅ Envoyé au PC', 'ok');
           return { ok: true, mode: 'http' };
         }
       }
     } catch (e) { console.warn('writeSyncBlob HTTP:', e); }
   }
   downloadBlob(filename, blob);
-  setStatus('✅ ' + filename + ' téléchargé (dossier sync non choisi)', 'info');
+  setStatus('✅ Enregistré', 'info');
   return { ok: true, mode: 'download' };
 }
 async function writeSyncFile(filename, data) {
@@ -1244,7 +1354,7 @@ function deferSyncFolder() {
   syncFolderDeferred = true;
   localStorage.setItem('ssk_mobile_sync_deferred', '1');
   closeModalBg('modal-sync-folder');
-  setStatus('ℹ️ Dossier sync reporté — fichiers dans Téléchargements', 'info');
+  setStatus('ℹ️ Synchronisation en attente', 'info');
 }
 async function restoreSyncHandle() {
   try {
@@ -1387,8 +1497,8 @@ async function sendToShop() {
     const count = pendingUpdates.reduce((s, u) => s + u.addQty, 0);
     addJournal('VENTES', 'Stock envoyé au magasin: ' + pendingUpdates.length + ' article(s), +' + count + ' unité(s)');
     pendingUpdates = []; saveLocal(); renderProducts();
-    setStatus(res.mode === 'folder' ? '✅ Envoyé dans le dossier sync !' : '✅ Envoyé ! Fichier téléchargé.', 'ok');
-    setTimeout(() => setStatus('🟢 En attente de confirmation...', 'info'), 3000);
+    setStatus('✅ Stock envoyé au magasin', 'ok');
+    setTimeout(renderStatusLine, 3000);
   } catch (e) { setStatus('❌ Erreur: ' + e.message, 'error'); }
   finally { btn.disabled = false; }
 }
@@ -1475,6 +1585,7 @@ function fillAchatFromProduct(p) {
   document.getElementById('a-tva').value = p.vatRate || 0;
   document.getElementById('a-fournisseur').value = p.fournisseur || '';
   syncAchatDemiGrosPlaceholder();
+  updateAchatTotal();
 }
 
 function onAchatCodeChanged() {
@@ -1492,6 +1603,27 @@ function syncAchatDemiGrosPlaceholder() {
   const v = parseFloat(document.getElementById('a-pvente').value);
   const el = document.getElementById('a-demigros');
   if (el) el.placeholder = (!isNaN(v) && v > 0) ? '= ' + v.toFixed(2) : '= P. Vente';
+}
+
+function updateAchatTotal() {
+  const el = document.getElementById('a-total-top');
+  if (!el) return;
+  const q = parseFloat(document.getElementById('a-qte')?.value) || 0;
+  const p = parseFloat(document.getElementById('a-pachat')?.value) || 0;
+  const draft = q * p;
+  const listTotal = achatsList.reduce((s, a) => s + (Number(a.qte) || 0) * (Number(a.p_achat) || 0), 0);
+  el.textContent = 'Total achat : ' + (listTotal + draft).toFixed(2) + ' DZD' +
+    (listTotal > 0 ? '  (liste : ' + listTotal.toFixed(2) + ' DZD)' : '');
+}
+
+function stepAchatQty(delta) {
+  const el = document.getElementById('a-qte');
+  if (!el) return;
+  let v = parseInt(el.value, 10);
+  if (isNaN(v)) v = 1;
+  v = Math.max(1, v + Number(delta || 0));
+  el.value = v;
+  updateAchatTotal();
 }
 
 function renderAchatCategoryList() {
@@ -1534,8 +1666,7 @@ async function addAchatToList() {
 
   const code = document.getElementById('a-code').value.trim() || null;
   const pVente = parseFloat(document.getElementById('a-pvente').value) || 0;
-  const demiRaw = document.getElementById('a-demigros').value.trim();
-  const pDemi = demiRaw === '' ? pVente : (parseFloat(demiRaw) || 0);
+  const pDemi = pVente; // TVA 19 % fixe et demi-gros gérés automatiquement par le PC
   const categorie = document.getElementById('a-categorie').value.trim() || 'Général';
   const existing = findProductByCode(code);
 
@@ -1572,13 +1703,6 @@ async function addAchatToList() {
       const ok = await askPriceChange(existing.name, existing.sellPrice, pVente);
       if (!ok) { setStatus('⏸️ Changement de prix annulé', 'info'); return; }
       priceChanged = true;
-    }
-
-    const oldDemi = existing.priceDemiGros > 0 ? existing.priceDemiGros : existing.sellPrice;
-    if (demiRaw !== '' && Math.abs(pDemi - oldDemi) > 0.001) {
-      const ok = await askPriceChange(existing.name + ' (P. Demi-gros)', oldDemi, pDemi);
-      if (!ok) { setStatus('⏸️ Changement du prix demi-gros annulé', 'info'); return; }
-      demiChanged = true;
     }
 
     // Point 05 : confirmation du changement de catégorie
@@ -1637,31 +1761,32 @@ async function addAchatToList() {
   syncAchatDemiGrosPlaceholder();
   renderAchatList();
   renderAchatCategoryList();
+  updateAchatTotal();
   setStatus('✅ ' + designation + ' ajouté à la liste', 'ok');
 }
 
 function renderAchatList() {
   const box = document.getElementById('achat-list');
   const title = document.getElementById('achat-list-title');
-  if (achatsList.length === 0) { box.innerHTML = '<div class="list-empty">Aucun article dans la liste</div>'; title.style.display = 'none'; return; }
+  if (achatsList.length === 0) { box.innerHTML = '<div class="list-empty">Aucun article dans la liste</div>'; title.style.display = 'none'; updateAchatTotal(); return; }
   title.style.display = 'block';
   let html = '<div class="list-scroll">';
   achatsList.forEach((a, i) => {
     const flags = [];
     if (a.prix_modifie) flags.push('<span style="color:#fbbf24">prix modifié</span>');
-    if (a.demi_gros_modifie) flags.push('<span style="color:#fbbf24">demi-gros modifié</span>');
     if (a.categorie_modifiee) flags.push('<span style="color:#fbbf24">catégorie modifiée</span>');
     if (a.ajout_stock) flags.push('<span style="color:#4ade80">stock existant</span>');
     html += `<div class="list-row" style="cursor:default">
       <div class="main">
         <div class="name">${escapeHtml(a.designation)} <span style="color:var(--muted);font-weight:400">×${a.qte}</span></div>
-        <div class="meta">${escapeHtml(a.categorie)} • Achat ${Number(a.p_achat).toFixed(2)} • Vente ${Number(a.p_vente).toFixed(2)} • D-gros ${Number(a.p_demi_gros).toFixed(2)}${flags.length ? ' • ' + flags.join(' • ') : ''}</div>
+        <div class="meta">${escapeHtml(a.categorie)} • Achat ${Number(a.p_achat).toFixed(2)} • Vente ${Number(a.p_vente).toFixed(2)}${flags.length ? ' • ' + flags.join(' • ') : ''}</div>
       </div>
       <button style="background:var(--danger);border:none;color:#fff;border-radius:6px;padding:6px 9px;cursor:pointer" onclick="removeAchat(${i})">✕</button>
     </div>`;
   });
   html += '</div>';
   box.innerHTML = html;
+  updateAchatTotal();
 }
 
 function removeAchat(i) { achatsList.splice(i, 1); saveLocal(); renderAchatList(); }
@@ -1699,8 +1824,8 @@ async function envoyerAchats() {
   achatsList = [];
   saveLocal();
   renderAchatList();
-  setStatus(res.mode === 'folder' ? '✅ Achats écrits dans le dossier sync !' : '✅ Achats téléchargés !', 'ok');
-  setTimeout(() => setStatus('🟢 En attente...', 'info'), 3000);
+  setStatus('✅ Achats envoyés au magasin', 'ok');
+  setTimeout(renderStatusLine, 3000);
 }
 
 /* ---------- FACTURES : CLIENTS, ARTICLES, LIGNES (points 10 & 11) ---------- */
@@ -1711,10 +1836,15 @@ function factureId() {
 }
 function resetFactureId() { sessionStorage.removeItem('ssk_current_facture_id'); }
 
+function isCounterCustomer(c) {
+  return String((c && c.name) || '').trim().toLowerCase().replace(/\s+/g, ' ') === 'client comptoir';
+}
+
 function renderFactureClientSelect() {
   const sel = document.getElementById('f-client-select');
   sel.innerHTML = '<option value="">-- Nouveau client --</option>';
-  customers.forEach(c => {
+  const listCustomers = customers.filter(c => !isCounterCustomer(c));
+  listCustomers.forEach(c => {
     const opt = document.createElement('option');
     opt.value = c.id;
     opt.innerText = c.name + (c.phone ? ' (' + c.phone + ')' : '');
@@ -1724,10 +1854,10 @@ function renderFactureClientSelect() {
 
   const list = document.getElementById('f-client-list');
   const count = document.getElementById('f-client-count');
-  if (count) count.textContent = customers.length;
+  if (count) count.textContent = listCustomers.length;
   if (!list) return;
   let html = `<div class="list-row${selectedFactureClientId ? '' : ' selected'}"><div class="main"><div class="name">🧾 Client Comptoir</div><div class="meta">Sans fiche client</div></div></div>`;
-  customers.forEach(c => {
+  listCustomers.forEach(c => {
     html += `<div class="list-row${String(c.id) === String(selectedFactureClientId) ? ' selected' : ''}">
       <div class="main"><div class="name">${escapeHtml(c.name)}</div><div class="meta">${escapeHtml(c.phone || '')}</div></div>
       ${c.balance ? `<div class="price">${Number(c.balance).toFixed(2)}</div>` : ''}
@@ -1736,10 +1866,10 @@ function renderFactureClientSelect() {
   list.innerHTML = html;
   list.querySelectorAll('.list-row').forEach((row, idx) => {
     row.onclick = () => {
-      selectedFactureClientId = idx === 0 ? '' : String(customers[idx - 1].id);
+      selectedFactureClientId = idx === 0 ? '' : String(listCustomers[idx - 1].id);
       sel.value = selectedFactureClientId;
       if (selectedFactureClientId) {
-        const c = customers[idx - 1];
+        const c = listCustomers[idx - 1];
         if (c) {
           document.getElementById('f-client-new').value = '';
           document.getElementById('f-client-phone').value = c.phone || '';
@@ -1756,15 +1886,23 @@ function factureUnitPrice(p, type) {
   return p.sellPrice;
 }
 
+function isTestProduct(p) {
+  const n = String((p && p.name) || '').trim().toLowerCase();
+  const c = String((p && p.code) || '').trim().toLowerCase();
+  const keys = ['test-export', 'plaquettes test tva', 'test retour'];
+  return keys.includes(n) || keys.includes(c);
+}
+
 function renderFactureProductList() {
   const list = document.getElementById('f-prod-list');
   if (!list) return;
   const search = document.getElementById('f-prod-search');
   const q = (search ? search.value : '').toLowerCase().trim();
   const filtered = products.filter(p =>
-    !q || p.name.toLowerCase().includes(q) ||
-    String(p.code).toLowerCase().includes(q) ||
-    String(p.category || '').toLowerCase().includes(q)
+    !isTestProduct(p) && (
+      !q || p.name.toLowerCase().includes(q) ||
+      String(p.code).toLowerCase().includes(q) ||
+      String(p.category || '').toLowerCase().includes(q))
   ).slice(0, 80);
   const count = document.getElementById('f-prod-count');
   if (count) count.textContent = filtered.length;
@@ -1848,11 +1986,45 @@ async function addFactureLine() {
 
 function lineTTC(l) { return num(l.sellPrice) * num(l.qty); }
 function lineHT(l) { const r = num(l.tva); return lineTTC(l) / (1 + r / 100); }
-function factureTotals() {
-  let ttc = 0, ht = 0;
-  factureLines.forEach(l => { ttc += lineTTC(l); ht += lineHT(l); });
-  return { ttc: ttc, ht: ht, tva: ttc - ht };
+function factureGlobalRemise() {
+  const el = document.getElementById('f-global-remise');
+  let r = el ? parseFloat(el.value) : 0;
+  if (isNaN(r) || r < 0) r = 0;
+  if (r > 100) r = 100;
+  return r;
 }
+function factureTotals() {
+  let raw = 0, htRaw = 0;
+  factureLines.forEach(l => { raw += lineTTC(l); htRaw += lineHT(l); });
+  const r = factureGlobalRemise();
+  const factor = 1 - r / 100;
+  const ttc = raw * factor;
+  const ht = htRaw * factor;
+  return { ttc: ttc, ht: ht, tva: ttc - ht, raw: raw, remise: r, remiseMontant: raw - ttc };
+}
+
+function renderFactureChange() {
+  const givenEl = document.getElementById('f-amount-given');
+  const el = document.getElementById('facture-change');
+  if (!el) return;
+  const givenRaw = givenEl ? givenEl.value : '';
+  const given = parseFloat(givenRaw);
+  const total = factureTotals().ttc;
+  if (givenRaw === '' || isNaN(given)) {
+    el.textContent = '0.00 DZD';
+    el.style.color = 'var(--muted)';
+    return;
+  }
+  const change = given - total;
+  if (change < 0) {
+    el.textContent = 'Manque ' + Math.abs(change).toFixed(2) + ' DZD';
+    el.style.color = '#f87171';
+  } else {
+    el.textContent = change.toFixed(2) + ' DZD';
+    el.style.color = '#4ade80';
+  }
+}
+function onFactureGlobalRemise() { renderFactureLines(); }
 
 function renderFactureLines() {
   const box = document.getElementById('facture-lines');
@@ -1863,6 +2035,7 @@ function renderFactureLines() {
   if (totalEl) totalEl.textContent = totals.ttc.toFixed(2) + ' DZD';
   if (htEl) htEl.textContent = 'HT: ' + totals.ht.toFixed(2);
   if (tvaEl) tvaEl.textContent = 'TVA: ' + totals.tva.toFixed(2);
+  renderFactureChange();
   if (!box) return;
   if (factureLines.length === 0) { box.innerHTML = '<div class="list-empty">Aucun article</div>'; return; }
   let html = '<div class="list-panel" style="margin-top:8px"><div class="list-scroll">';
@@ -1914,6 +2087,8 @@ function getFactureData() {
     };
   });
   const totals = factureTotals();
+  const givenEl = document.getElementById('f-amount-given');
+  const given = givenEl ? parseFloat(givenEl.value) : 0;
   return {
     id: factureId(),
     client: clientName,
@@ -1924,6 +2099,10 @@ function getFactureData() {
     totalHT: totals.ht,
     totalTVA: totals.tva,
     totalTTC: totals.ttc,
+    remiseGlobale: totals.remise,
+    remiseMontant: totals.remiseMontant,
+    montantDonne: isNaN(given) ? 0 : given,
+    rendu: isNaN(given) ? 0 : Math.max(0, given - totals.ttc),
     date: new Date().toISOString(),
     paymentMode: 'ESPECES',
     shop: shopInfo()
@@ -1952,10 +2131,30 @@ async function saveFacture(silent) {
   archiveMobileSale(facture);
   addJournal('FACTURE', 'Facture ' + facture.id + ' enregistr\u00e9e: ' + facture.client + ' — ' + facture.total.toFixed(2) + ' DZD');
   if (!silent) {
-    setStatus(res.mode === 'folder' ? '\u2705 Facture \u00e9crite dans le dossier sync' : '\u2705 Facture enregistr\u00e9e (t\u00e9l\u00e9charg\u00e9e)', 'ok');
-    setTimeout(() => setStatus('\ud83d\udfe2 En attente...', 'info'), 3000);
+    setStatus('✅ Facture enregistrée', 'ok');
+    setTimeout(renderStatusLine, 3000);
   }
   return true;
+}
+
+/* ---------- VALIDER & ENVOYER AU PC (bouton unique) ---------- */
+async function validerEtEnvoyerFacture() {
+  if (factureLines.length === 0) { alert('Aucun article dans la facture.'); return; }
+  const ok = await confirmDialog('✅ Valider la facture',
+    'Total : <b style="color:var(--primary)">' + factureTotals().ttc.toFixed(2) + ' DZD</b><br><br>' +
+    'Envoyer cette facture au PC et l\'enregistrer dans l\'historique ?');
+  if (!ok) return;
+  const done = await saveFacture(true);
+  if (!done) { setStatus('❌ Envoi de la facture impossible', 'error'); return; }
+  factureLines = [];
+  saveLocal();
+  resetFactureId();
+  const givenEl = document.getElementById('f-amount-given');
+  if (givenEl) givenEl.value = '';
+  const remEl = document.getElementById('f-global-remise');
+  if (remEl) remEl.value = '0';
+  renderFactureLines();
+  setStatus('✅ Facture validée et envoyée au PC', 'ok');
 }
 
 /* ---------- ENVOI & SAUVEGARDE (JSON + PDF puis vidange) ---------- */
@@ -2139,7 +2338,7 @@ async function downloadInvoicePdf() {
     const filename = 'Facture-' + f.id + '.pdf';
     const res = await writeSyncBlob(filename, blob);
     addJournal('FACTURE', 'PDF g\u00e9n\u00e9r\u00e9: ' + filename);
-    setStatus(res.mode === 'folder' ? '\u2705 PDF enregistr\u00e9 dans le dossier sync' : '\u2705 PDF t\u00e9l\u00e9charg\u00e9', 'ok');
+    setStatus('\u2705 PDF téléchargé', 'ok');
   } catch (e) {
     console.warn('PDF:', e);
     setStatus('\u26a0\ufe0f PDF indisponible \u2014 ouverture de l\'impression', 'error');
@@ -2303,8 +2502,23 @@ function renderUndoSaleBlock() {
   if (txt) txt.innerHTML = `Dernière vente <b>${escapeHtml(String(sale.id))}</b> • <b>${num(sale.totalTTC || sale.total).toFixed(2)} DZD</b> • ${escapeHtml(sale.client || 'Client')}<br><span style="color:var(--warning)">⏱ Il reste ${mins} minute(s) — ensuite l'Undo disparaît.</span>`;
 }
 
+let historyRange = '';
+function setHistoryRange(range) {
+  historyRange = (historyRange === range) ? '' : range;
+  ['today', 'yesterday', 'week'].forEach(r => {
+    const b = document.getElementById('hq-' + r);
+    if (b) b.classList.toggle('active', historyRange === r);
+  });
+  renderMobileHistory();
+}
 function resetMobileHistoryFilters() {
-  ['h-ticket', 'h-product', 'h-amount', 'h-time'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  historyRange = '';
+  const s = document.getElementById('h-search');
+  if (s) s.value = '';
+  ['today', 'yesterday', 'week'].forEach(r => {
+    const b = document.getElementById('hq-' + r);
+    if (b) b.classList.remove('active');
+  });
   renderMobileHistory();
 }
 
@@ -2359,27 +2573,55 @@ function buildHistoryRows() {
   return rows.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
 }
 
+function localDayKey(d) {
+  const x = new Date(d || 0);
+  if (isNaN(x.getTime())) return '';
+  return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
+}
+
 function renderMobileHistory() {
   const box = document.getElementById('mobile-history-list');
   if (!box) return;
-  const ticket = (document.getElementById('h-ticket')?.value || '').trim();
-  const product = (document.getElementById('h-product')?.value || '').trim().toLowerCase();
-  const amountRaw = (document.getElementById('h-amount')?.value || '').trim();
-  const timeRaw = (document.getElementById('h-time')?.value || '').trim().toLowerCase();
-  const amount = amountRaw ? parseFloat(amountRaw) : null;
+  const search = (document.getElementById('h-search')?.value || '').trim().toLowerCase();
 
   let rows = buildHistoryRows();
-  if (ticket) rows = rows.filter(s => String(s.id || '').includes(ticket));
-  if (product) rows = rows.filter(s => (s.items || []).some(a => String(a.name || '').toLowerCase().includes(product) || String(a.code || '').toLowerCase().includes(product)));
-  if (amount != null && !isNaN(amount)) rows = rows.filter(s => Math.abs(num(s.total) - amount) < 0.51);
-  if (timeRaw) {
+
+  // Total du jour (toujours calculé sur toutes les ventes du jour)
+  const todayKey = localDayKey(new Date());
+  const todayTotal = rows.reduce((sum, s) => {
+    if (localDayKey(s.date) !== todayKey) return sum;
+    if (s.isInverse || s.isSettlement || s.returnedAt) return sum;
+    return sum + num(s.total);
+  }, 0);
+  const todayEl = document.getElementById('m-history-today-total');
+  if (todayEl) todayEl.textContent = 'Total du jour : ' + todayTotal.toFixed(2) + ' DZD';
+
+  // Recherche unique : ticket, client, produit, code, montant, mode de paiement
+  if (search) {
     rows = rows.filter(s => {
-      const d = new Date(s.date || 0);
-      if (isNaN(d.getTime())) return false;
-      const hhmm = d.toTimeString().slice(0, 5);
-      const ddmm = d.toLocaleDateString('fr-FR');
-      const iso = d.toISOString().slice(0, 10);
-      return hhmm.includes(timeRaw) || ddmm.toLowerCase().includes(timeRaw) || iso.includes(timeRaw) || String(s.date || '').toLowerCase().includes(timeRaw);
+      const hay = [
+        String(s.id || ''), s.client || '', s.paymentMode || '',
+        num(s.total).toFixed(2),
+        (s.items || []).map(a => (a.name || '') + ' ' + (a.code || '')).join(' ')
+      ].join(' ').toLowerCase();
+      return hay.includes(search);
+    });
+  }
+
+  // Filtres rapides : Aujourd'hui / Hier / Cette semaine
+  if (historyRange === 'today') {
+    rows = rows.filter(s => localDayKey(s.date) === todayKey);
+  } else if (historyRange === 'yesterday') {
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    const yKey = localDayKey(y);
+    rows = rows.filter(s => localDayKey(s.date) === yKey);
+  } else if (historyRange === 'week') {
+    const now = new Date();
+    const day = (now.getDay() + 6) % 7; // lundi = 0
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day, 0, 0, 0, 0);
+    rows = rows.filter(s => {
+      const t = new Date(s.date || 0).getTime();
+      return !isNaN(t) && t >= monday.getTime();
     });
   }
   rows = rows.slice(0, 300);
@@ -2387,7 +2629,7 @@ function renderMobileHistory() {
   const countEl = document.getElementById('m-history-count');
   if (countEl) countEl.textContent = rows.length + ' vente(s)';
   if (!rows.length) {
-    box.innerHTML = '<div class="list-empty">Aucune vente dans l\'historique.<br>Les ventes enregistrées depuis l\'onglet Facture apparaissent ici.</div>';
+    box.innerHTML = '<div class="list-empty">Aucune vente trouvée.</div>';
     return;
   }
   box.innerHTML = rows.map(s => {
@@ -2475,7 +2717,7 @@ async function applyMobileReturn(sale, type) {
   renderMobileHistory();
   renderDailySummary();
   renderLowStockBanner();
-  setStatus(mode === 'folder' ? '✅ Retour/Undo écrit dans le dossier sync' : '✅ Retour/Undo enregistré (fichier téléchargé)', 'ok');
+  setStatus('✅ Retour enregistré', 'ok');
   return true;
 }
 
@@ -2577,7 +2819,11 @@ function renderLowStockBanner() {
 function renderCreditView() {
   const list = document.getElementById('credit-client-list');
   if (!list) return;
-  const debtors = customers.filter(c => num(c.credit) > 0).sort((a, b) => num(b.credit) - num(a.credit));
+  const q = (document.getElementById('credit-search')?.value || '').trim().toLowerCase();
+  const allDebtors = customers.filter(c => num(c.credit) > 0).sort((a, b) => num(b.credit) - num(a.credit));
+  const debtors = q
+    ? allDebtors.filter(c => String(c.name || '').toLowerCase().includes(q) || String(c.phone || '').includes(q))
+    : allDebtors;
   const totalEl = document.getElementById('m-credit-total');
   const countEl = document.getElementById('m-credit-count');
   const total = debtors.reduce((a, c) => a + num(c.credit), 0);
@@ -2592,11 +2838,12 @@ function renderCreditView() {
       return `<div class="list-row" style="cursor:default;align-items:flex-start">
         <div class="main"><div class="name">${escapeHtml(c.name || 'Client')}</div>
         <div class="meta">${escapeHtml(c.phone || '-')} • depuis ${when}</div></div>
-        <div style="min-width:100px;text-align:right">
+        <div style="min-width:112px;text-align:right">
           <div style="font-weight:900;color:#f87171;font-size:.8rem">${num(c.credit).toFixed(2)} DZD</div>
           <button class="btn-confirm" style="padding:6px 8px;border-radius:8px;font-size:.66rem;margin-top:4px" onclick="openCreditPay(${Number(c.id)})">💰 Régler</button>
-          <div style="display:flex;gap:4px;justify-content:flex-end;margin-top:4px">
+          <div style="display:flex;gap:4px;justify-content:flex-end;margin-top:4px;flex-wrap:wrap">
             <button class="btn-cancel" style="padding:5px 6px;border-radius:7px;border:1px solid var(--border);font-size:.62rem" onclick="openMobileStatement(${Number(c.id)})">📄 Relevé</button>
+            <button class="btn-cancel" style="padding:5px 6px;border-radius:7px;border:1px solid var(--info);color:var(--info);font-size:.62rem" onclick="callClient(${Number(c.id)})">📞 Appeler</button>
             <button class="btn-cancel" style="padding:5px 6px;border-radius:7px;border:1px solid var(--success);color:var(--success);font-size:.62rem" onclick="openMobileStatementWhatsApp(${Number(c.id)})">📱</button>
           </div>
         </div>
@@ -2610,6 +2857,14 @@ function renderCreditView() {
       ? rows.map(j => `<div class="list-row" style="cursor:default"><div class="main"><div class="name">${escapeHtml(j.message)}</div><div class="meta">${new Date(j.ts).toLocaleString('fr-FR')}</div></div></div>`).join('')
       : '<div class="list-empty">Aucun règlement enregistré.</div>';
   }
+}
+
+function callClient(id) {
+  const c = customers.find(x => Number(x.id) === Number(id));
+  const phone = String((c && c.phone) || '').replace(/[^\d+]/g, '');
+  if (!phone) { alert('⚠️ Aucun numéro de téléphone pour ce client.'); return; }
+  addJournal('APPEL', 'Appel client ' + ((c && c.name) || ''), { customerId: id, phone: phone });
+  window.location.href = 'tel:' + phone;
 }
 
 function openCreditPay(id) {
@@ -2683,7 +2938,7 @@ async function confirmCreditPayment() {
   closeCreditPay();
   renderCreditView();
   renderDailySummary();
-  setStatus(mode === 'folder' ? '✅ Règlement écrit dans le dossier sync' : '✅ Règlement enregistré (fichier téléchargé)', 'ok');
+  setStatus('✅ Règlement enregistré', 'ok');
 }
 
 /* ============================================================
@@ -2756,10 +3011,10 @@ function renderInventoryList() {
   }
   box.innerHTML = inventoryCounts.slice().reverse().map(r => {
     const diff = num(r.counted) - num(r.systemQty);
-    const color = diff === 0 ? 'var(--muted)' : (diff > 0 ? 'var(--success)' : 'var(--danger)');
+    const cls = diff === 0 ? 'diff-zero' : (diff > 0 ? 'diff-up' : 'diff-down');
     return `<div class="list-row" style="cursor:default">
       <div class="main"><div class="name">${escapeHtml(r.name || r.code)}</div>
-      <div class="meta">${escapeHtml(r.code)} • système ${r.systemQty} • <b style="color:${color}">compté ${r.counted} (${diff > 0 ? '+' : ''}${diff})</b></div></div>
+      <div class="meta">${escapeHtml(r.code)} • système ${r.systemQty} • compté ${r.counted} • <b class="${cls}">${diff > 0 ? '+' : ''}${diff}</b></div></div>
       <div style="min-width:60px;text-align:right">
         <button class="btn-cancel" style="padding:5px 8px;border-radius:7px;border:1px solid var(--danger);color:var(--danger);font-size:.66rem" onclick="removeInventoryCount('${escapeHtml(String(r.code)).replace(/'/g, '')}')">✕</button>
       </div>
@@ -2771,8 +3026,6 @@ function renderInventoryView() {
   renderInventoryList();
   const countEl = document.getElementById('inv-count');
   if (countEl) countEl.textContent = String(inventoryCounts.length);
-  const sent = localStorage.getItem('ssk_inventory_sent_at');
-  if (sent) setStatus('📷 ' + inventoryCounts.length + ' article(s) comptés — dernier envoi ' + new Date(sent).toLocaleString('fr-FR'), 'info');
 }
 
 function removeInventoryCount(code) {
@@ -2793,6 +3046,10 @@ async function clearInventoryCounts() {
 
 async function sendInventoryToPC() {
   if (!inventoryCounts.length) { alert('⚠️ Aucun comptage à envoyer.'); return; }
+  const ok = await confirmDialog('📤 Envoyer l\'inventaire',
+    'Es-tu sûr ? Tu vas changer le stock.<br><br>' +
+    '<b>' + inventoryCounts.length + '</b> article(s) comptés seront appliqués sur le PC.');
+  if (!ok) return;
   const payload = {
     version: 'SSK-POS-V8-INVENTAIRE',
     sentAt: new Date().toISOString(),
@@ -2803,7 +3060,7 @@ async function sendInventoryToPC() {
     const res = await writeSyncFile('SSK-INVENTAIRE-MOBILE.json', payload);
     localStorage.setItem('ssk_inventory_sent_at', payload.sentAt);
     addJournal('INVENTAIRE', 'Inventaire envoyé au PC : ' + inventoryCounts.length + ' article(s)', { count: inventoryCounts.length, mode: res.mode });
-    setStatus(res.mode === 'folder' ? '✅ Inventaire écrit dans le dossier sync' : '✅ Inventaire téléchargé (dossier sync non choisi)', 'ok');
+    setStatus('✅ Inventaire envoyé au PC', 'ok');
     renderInventoryView();
     mobileNotify('📷 Inventaire envoyé', inventoryCounts.length + ' article(s) — validez sur le PC');
   } catch (e) {
@@ -2934,7 +3191,7 @@ async function sendApprovalRequest() {
     addJournal('APPROBATION', 'Demande ' + type + ' envoyée au PC' + (ref ? ' — ' + ref : ''), req);
     closeModalBg('modal-approval-request');
     renderMobileStatusBlock();
-    setStatus(res.mode === 'folder' ? '✅ Demande d\'approbation écrite dans le dossier sync' : '✅ Demande d\'approbation téléchargée', 'ok');
+    setStatus('⏳ Demande envoyée — vérification automatique toutes les 5 s…', 'info');
   } catch (e) {
     console.error('sendApprovalRequest', e);
     alert('❌ Envoi de la demande impossible : ' + (e.message || e));
@@ -2979,12 +3236,18 @@ function renderApprovalStatus() {
   const last = getLastApprovalRequest();
   const storedResp = getStoredApprovalResponse();
   const resp = (storedResp && approvalResponseMatches(storedResp, last)) ? storedResp : null;
-  if (!last) { el.innerHTML = '📲 Aucune demande d\'approbation envoyée.'; return; }
+  if (!last) { el.innerHTML = '📲 Aucune demande envoyée.'; return; }
   let state = '⏳ en attente du PC';
   let color = 'var(--warning)';
   if (resp) {
     state = resp.approved ? '✅ approuvée' : '❌ refusée';
     color = resp.approved ? 'var(--success)' : 'var(--danger)';
+  } else {
+    const age = Date.now() - new Date(last.date || 0).getTime();
+    if (age > 5 * 60 * 1000) {
+      state = '⌛ expirée — aucune réponse du PC';
+      color = 'var(--muted)';
+    }
   }
   el.innerHTML = '📲 ' + escapeHtml(last.type || 'Demande') + (last.ref ? ' #' + escapeHtml(last.ref) : '') + (last.amount ? ' — ' + p2Money(last.amount) : '') + ' : <b style="color:' + color + '">' + state + '</b>';
 }
@@ -3042,9 +3305,9 @@ async function waitForPcApproval(type, ref, amount, message) {
       setStatus(data.approved ? '✅ PC : modification approuvée' : '❌ PC : modification refusée', data.approved ? 'ok' : 'error');
       return !!data.approved;
     }
-    await new Promise(resolve => setTimeout(resolve, 2500));
+    await new Promise(resolve => setTimeout(resolve, 5000));
   }
-  setStatus('⏱️ Toujours en attente du PC — modification non appliquée', 'error');
+  setStatus('⌛ Demande expirée — aucune réponse du PC', 'error');
   renderMobileStatusBlock();
   return false;
 }
@@ -3066,42 +3329,31 @@ async function requestNotificationPermission() {
   try {
     const perm = await Notification.requestPermission();
     renderNotificationState();
-    setStatus(perm === 'granted' ? '🔔 Notifications activées' : '⚠️ Notifications refusées (' + perm + ')', perm === 'granted' ? 'ok' : 'error');
+    setStatus(perm === 'granted' ? '🔔 Notifications activées' : '⚠️ Notifications refusées', perm === 'granted' ? 'ok' : 'error');
     if (perm === 'granted') mobileNotify('🔔 Notifications activées', 'Vous serez averti des mises à jour et approbations.');
   } catch (e) { alert('Notifications indisponibles : ' + (e.message || e)); }
 }
 function renderNotificationState() {
   const el = document.getElementById('notif-state');
-  if (!el) return;
   const perm = ('Notification' in window) ? Notification.permission : 'unsupported';
-  const map = { granted: '✅ activées', default: '⚠️ non activées', denied: '❌ refusées dans le navigateur', unsupported: '❌ non supportées' };
-  el.innerHTML = 'État : <b>' + (map[perm] || perm) + '</b>';
+  if (el) {
+    const map = { granted: '✅ activées', default: '⚠️ non activées', denied: '❌ refusées dans le navigateur', unsupported: '❌ non supportées' };
+    el.innerHTML = 'État : <b>' + (map[perm] || perm) + '</b>';
+  }
+  // Pas de doublon : on cache le bouton d'activation si déjà accordé
+  const granted = (perm === 'granted');
+  const enableBtn = document.getElementById('btn-notif-enable');
+  if (enableBtn) enableBtn.style.display = granted ? 'none' : 'block';
+  const topBtn = document.getElementById('btn-notif-top');
+  if (topBtn) topBtn.style.display = granted ? 'none' : 'inline-block';
 }
 async function pollMobileNotifications() {
-  try {
-    let data = null;
-    const syncRead = await readSyncFile('SSK-POS-LIVE.json');
-    if (syncRead && syncRead.data) data = syncRead.data;
-    if (!data) {
-      const r = await fetch(LIVE_PATH + '?t=' + Date.now(), { cache: 'no-store' });
-      if (r.ok) data = await r.json();
-    }
-    if (data) {
-      const stamp = liveStampOf(data);
-      if (stamp && lastLiveNotifiedStamp && stamp !== lastLiveNotifiedStamp) {
-        mobileNotify('🔄 Mise à jour du magasin', (Array.isArray(data.products) ? data.products.length + ' articles' : 'Données reçues') + ' — ' + new Date().toLocaleTimeString('fr-FR'));
-        addJournal('SYNC', 'Nouvelle version LIVE détectée', { stamp });
-        // Point 10 : applique immédiatement les changements PC (stock, prix, articles).
-        await loadLiveFile();
-      }
-      if (stamp) lastLiveNotifiedStamp = stamp;
-    }
-  } catch (e) { /* hors ligne */ }
+  // Les notifications proviennent directement du fichier LIVE,
+  // détecté par loadLiveFile() à chaque cycle de 5 secondes.
   await checkApprovalResponse(false);
 }
 function startMobileNotificationPolling() {
-  if (mobileNotifyTimer) return;
-  mobileNotifyTimer = setInterval(() => { pollMobileNotifications().catch(() => {}); }, 20000);
+  // Le polling temps réel est assuré par startLivePolling() (toutes les 5 s).
 }
 
 /* ---------- PIN & BIOMÉTRIE ---------- */
@@ -3124,7 +3376,6 @@ async function hashMobilePin(pin) {
 function mobilePinEnabled() {
   return localStorage.getItem(MOBILE_PIN_ENABLED_KEY) === '1' && !!localStorage.getItem(MOBILE_PIN_KEY);
 }
-function bioEnabled() { return !!localStorage.getItem(MOBILE_BIO_KEY); }
 async function saveMobilePin() {
   const pin = (document.getElementById('pin-new')?.value || '').trim();
   const confirmPin = (document.getElementById('pin-confirm')?.value || '').trim();
@@ -3151,24 +3402,50 @@ async function removeMobilePin() {
   renderSecurityView();
   setStatus('PIN supprimé', 'info');
 }
+/* ---------- PIN : CLAVIER GROS CHIFFRES ---------- */
+function renderPinDots() {
+  const input = document.getElementById('lock-pin');
+  const dots = document.getElementById('lock-dots');
+  if (!dots) return;
+  const n = input ? input.value.length : 0;
+  dots.textContent = n ? '•'.repeat(n) : '• • • •';
+}
+function pinKey(d) {
+  const input = document.getElementById('lock-pin');
+  if (!input) return;
+  if (input.value.length >= 8) return;
+  input.value += String(d);
+  renderPinDots();
+  const err = document.getElementById('lock-error');
+  if (err) err.textContent = '';
+}
+function pinBack() {
+  const input = document.getElementById('lock-pin');
+  if (!input) return;
+  input.value = input.value.slice(0, -1);
+  renderPinDots();
+}
+function pinClear() {
+  const input = document.getElementById('lock-pin');
+  if (input) input.value = '';
+  renderPinDots();
+}
+
 function showMobileLock() {
   const overlay = document.getElementById('mobile-lock-overlay');
   if (!overlay) return;
   overlay.style.display = 'flex';
-  const bioBtn = document.getElementById('lock-bio-btn');
-  if (bioBtn) bioBtn.style.display = bioEnabled() ? 'block' : 'none';
   const err = document.getElementById('lock-error');
   if (err) err.textContent = '';
-  const input = document.getElementById('lock-pin');
-  if (input) { input.value = ''; setTimeout(() => { try { input.focus(); } catch (e) {} }, 200); }
+  pinClear();
 }
 function hideMobileLock() {
   const overlay = document.getElementById('mobile-lock-overlay');
   if (overlay) overlay.style.display = 'none';
 }
 function lockMobileApp() {
-  if (!mobilePinEnabled() && !bioEnabled()) {
-    alert('⚠️ Activez d\'abord un code PIN ou la biométrie.');
+  if (!mobilePinEnabled()) {
+    alert('⚠️ Activez d\'abord un code PIN.');
     return;
   }
   sessionStorage.removeItem('ssk_mobile_unlocked');
@@ -3181,118 +3458,36 @@ async function unlockMobileApp() {
   const hash = await hashMobilePin(pin);
   if (hash !== localStorage.getItem(MOBILE_PIN_KEY)) {
     if (err) err.textContent = '❌ Code PIN incorrect.';
-    const input = document.getElementById('lock-pin');
-    if (input) { input.value = ''; input.focus(); }
+    pinClear();
     return;
   }
   sessionStorage.setItem('ssk_mobile_unlocked', '1');
+  pinClear();
   hideMobileLock();
   renderMobileStatusBlock();
   setStatus('🔓 Déverrouillé', 'ok');
-}
-function bufToB64(buf) {
-  const bytes = new Uint8Array(buf);
-  let bin = '';
-  bytes.forEach(b => { bin += String.fromCharCode(b); });
-  return btoa(bin);
-}
-function b64ToBuf(b64) {
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes;
-}
-async function registerBiometrics() {
-  if (!window.PublicKeyCredential || !navigator.credentials || !navigator.credentials.create) {
-    alert('❌ Biométrie non supportée par ce navigateur/appareil.');
-    return;
-  }
-  try {
-    const challenge = crypto.getRandomValues(new Uint8Array(32));
-    const userId = crypto.getRandomValues(new Uint8Array(16));
-    const cred = await navigator.credentials.create({
-      publicKey: {
-        challenge,
-        rp: { name: 'SSK POS Mobile' },
-        user: { id: userId, name: 'ssk-mobile', displayName: 'SSK POS Mobile' },
-        pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
-        authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
-        timeout: 60000,
-        attestation: 'none'
-      }
-    });
-    if (!cred) return;
-    localStorage.setItem(MOBILE_BIO_KEY, bufToB64(cred.rawId));
-    sessionStorage.setItem('ssk_mobile_unlocked', '1');
-    addJournal('SECURITE', 'Biométrie activée');
-    renderSecurityView();
-    setStatus('✅ Biométrie activée', 'ok');
-  } catch (e) {
-    console.warn('registerBiometrics', e);
-    alert('❌ Activation biométrie impossible : ' + (e.message || e));
-  }
-}
-async function removeBiometrics() {
-  if (!bioEnabled()) { alert('Biométrie non activée.'); return; }
-  const ok = await confirmDialog('👆 Désactiver la biométrie', 'Supprimer l\'empreinte enregistrée sur cet appareil ?');
-  if (!ok) return;
-  localStorage.removeItem(MOBILE_BIO_KEY);
-  addJournal('SECURITE', 'Biométrie désactivée');
-  renderSecurityView();
-  setStatus('Biométrie désactivée', 'info');
-}
-async function unlockWithBiometrics() {
-  const id = localStorage.getItem(MOBILE_BIO_KEY);
-  const err = document.getElementById('lock-error');
-  if (!id) { if (err) err.textContent = 'Aucune biométrie enregistrée.'; return; }
-  if (!navigator.credentials || !navigator.credentials.get) { if (err) err.textContent = 'Biométrie non supportée.'; return; }
-  try {
-    const challenge = crypto.getRandomValues(new Uint8Array(32));
-    const cred = await navigator.credentials.get({
-      publicKey: {
-        challenge,
-        timeout: 60000,
-        userVerification: 'required',
-        allowCredentials: [{ type: 'public-key', id: b64ToBuf(id) }]
-      }
-    });
-    if (!cred) return;
-    sessionStorage.setItem('ssk_mobile_unlocked', '1');
-    hideMobileLock();
-    renderMobileStatusBlock();
-    setStatus('🔓 Déverrouillé par biométrie', 'ok');
-  } catch (e) {
-    console.warn('unlockWithBiometrics', e);
-    if (err) err.textContent = '❌ Biométrie refusée ou indisponible.';
-  }
 }
 function renderSecurityView() {
   const pinEl = document.getElementById('pin-state');
   if (pinEl) pinEl.innerHTML = mobilePinEnabled()
     ? '✅ PIN actif sur cet appareil. <span style="color:var(--muted)">Il sera demandé à l\'ouverture.</span>'
     : '⚠️ Aucun PIN. Activez-en un pour protéger l\'application.';
-  const bioEl = document.getElementById('bio-state');
-  if (bioEl) bioEl.innerHTML = bioEnabled() ? '✅ Empreinte / biométrie enregistrée.' : '⚠️ Biométrie non configurée.';
   renderNotificationState();
 }
 
 /* ---------- ÉTAT SYNC / LIAISON PC ---------- */
 function renderMobileStatusBlock() {
-  const lines = document.getElementById('mobile-status-lines');
-  if (lines) {
-    const lastSync = localStorage.getItem('ssk_mobile_last_sync');
-    const lastSyncTxt = lastSync
-      ? new Date(lastSync).toLocaleString('fr-FR')
-      : (products.length ? 'cache local — synchronisation PC en attente' : 'aucune donnée — vérifiez le dossier sync');
-    const pending = pendingUpdates.reduce((a, u) => a + (Number(u.addQty) || 0), 0);
-    const invSent = localStorage.getItem('ssk_inventory_sent_at');
-    lines.innerHTML =
-      '🟢 <b>' + products.length + '</b> article(s) • ⏳ <b>' + pending + '</b> unité(s) en attente<br>' +
-      '🕒 Dernière synchro : ' + lastSyncTxt + '<br>' +
-      '📷 Inventaire : ' + (inventoryCounts.length ? inventoryCounts.length + ' compté(s)' : 'vide') + (invSent ? ' • envoyé ' + new Date(invSent).toLocaleTimeString('fr-FR') : '') + '<br>' +
-      '🔔 Notifications : ' + (('Notification' in window) ? Notification.permission : 'non supportées');
-  }
   renderApprovalStatus();
+  renderNotificationState();
+}
+
+function renderParametres() {
+  const el = document.getElementById('param-sync-state');
+  if (!el) return;
+  const last = syncState.lastSyncAt ? new Date(syncState.lastSyncAt).toLocaleString('fr-FR') : '—';
+  el.innerHTML = (syncState.connected ? '🟢 Connecté' : '🔴 Déconnecté') +
+    ' • Dernière synchro : <b>' + escapeHtml(last) + '</b><br>' +
+    '📦 ' + products.length + ' article(s) • ⏳ ' + pendingUpdates.length + ' en attente';
 }
 
 /* ---------- INIT ---------- */
@@ -3326,30 +3521,37 @@ window.addEventListener('DOMContentLoaded', async () => {
   let hiddenAt = 0;
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { hiddenAt = Date.now(); return; }
-    if (hiddenAt && Date.now() - hiddenAt > 60000 && (mobilePinEnabled() || bioEnabled())) {
+    // Retour au premier plan : reconnexion immédiate
+    loadLiveFile({ silent: true }).catch(() => {});
+    if (hiddenAt && Date.now() - hiddenAt > 60000 && mobilePinEnabled()) {
       lockMobileApp();
     }
     hiddenAt = 0;
   });
+  // Reconnexion automatique : réseau qui revient, PC sortie de veille
+  window.addEventListener('online', () => { loadLiveFile({ silent: true }).catch(() => {}); });
+  window.addEventListener('offline', () => { syncState.connected = false; renderStatusLine(); });
+
   renderMobileStatusBlock();
   syncAchatDemiGrosPlaceholder();
+  updateAchatTotal();
   const catBox = document.getElementById('a-category-list');
   if (catBox) { catBox.style.display = 'none'; catBox.innerHTML = ''; }
 
   await restoreSyncHandle();
-  // Point 10 : en mode serveur PC (QR/WiFi), aucune fenêtre de dossier ne doit bloquer l'ouverture.
-  if (!isMobileServerMode() && !syncFolderName && !syncFolderDeferred) {
-    showSyncFolderState();
-    document.getElementById('modal-sync-folder').classList.add('active');
-  }
+  // Aucune fenêtre bloquante au démarrage : la synchro se lance seule.
+  // Le dossier peut être choisi à tout moment dans ⚙️ Paramètres.
 
-  if (products.length === 0) { loadLiveFile(); }
-  else { setStatus('🟢 ' + products.length + ' articles (cache local)', 'ok'); loadLiveFile(); }
-
-  // Point 08 : synchronisation automatique 3 secondes après l'ouverture, sans aucun clic.
-  setTimeout(() => { loadLiveFile().catch(() => {}); }, 3000);
-  // Puis rafraîchissement automatique régulier pour rester lié au fichier LIVE du PC.
-  setInterval(() => { loadLiveFile().catch(() => {}); }, 60000);
+  // SPLASH 2 SECONDES → SYNCHRONISATION AUTOMATIQUE, SANS AUCUN CLIC
+  if (products.length) renderStatusLine(); else { syncState.connected = false; renderStatusLine(); }
+  setTimeout(async () => {
+    const splash = document.getElementById('mobile-splash');
+    if (splash) splash.style.display = 'none';
+    setStatus('⏳ Synchronisation en cours...', 'info');
+    await loadLiveFile();
+    startLivePolling();
+    checkApprovalResponse(false).catch(() => {});
+  }, 2000);
 });
 </script>
 </body>
