@@ -204,6 +204,8 @@
     #invoice-print-host .inv-sheet{min-height:auto !important}
   }
 </style>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#111111">
 </head>
 <body>
 
@@ -3555,6 +3557,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     checkApprovalResponse(false).catch(() => {});
   }, 2000);
 });
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
 </script>
 </body>
 </html>
