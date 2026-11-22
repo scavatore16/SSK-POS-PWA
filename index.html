@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0c0e14">
+<meta name="application-name" content="SSK POS">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SSK POS">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="64x64" href="./favicon-64.png">
+<link rel="apple-touch-icon" sizes="192x192" href="./icon-192.png">
 <title>SSK-POS Mobile V9</title>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
@@ -94,6 +102,13 @@
   .journal-row{border-bottom:1px solid #202637;padding:6px 8px;font-size:.66rem;color:#cbd5e1}
   .journal-row b{color:var(--gold)}
   .hidden{display:none!important}
+  .conn{display:flex;align-items:center;justify-content:center;gap:6px;font-size:.66rem;font-weight:800;margin-bottom:6px;color:var(--muted)}
+  .conn .dot{width:8px;height:8px;border-radius:50%;background:#64748b}
+  .conn.on .dot{background:#22c55e;box-shadow:0 0 8px rgba(34,197,94,.8)}
+  .conn.warn .dot{background:#f59e0b}
+  .conn.off .dot{background:#ef4444}
+  .pair-code{font-size:2rem;letter-spacing:10px;font-weight:900;color:var(--gold);text-align:center;padding:6px 0}
+  .debug-pre{white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,Consolas,monospace;font-size:.62rem;line-height:1.5;color:#cbd5e1;background:#0b0d13;border:1px solid var(--border);border-radius:8px;padding:10px;max-height:54vh;overflow:auto}
 </style>
 </head>
 <body>
@@ -107,6 +122,8 @@
 <h1>📱 SSK-POS Mobile</h1>
 <div class="subtitle">Tableau de bord · Achats · Dettes — lecture PC</div>
 
+<div class="conn" id="conn-pill"><span class="dot"></span><span id="conn-text">⚪ غير مربوط بالحاسوب</span></div>
+
 <div class="tools">
   <button class="tool" id="btn-sync" onclick="openSyncModal()">📁 Dossier</button>
   <button class="tool" id="btn-alerts" onclick="openAlerts('seuil')">🔔 Alertes</button>
@@ -119,6 +136,7 @@
   <button class="btn btn-sm btn-primary" style="margin-top:6px" onclick="requestFolderPermission()">إعادة السماح</button>
 </div>
 <div class="status" id="status">⏳ تهيئة…</div>
+<div class="banner warn hidden" id="stale-banner"></div>
 <div class="banner info hidden" id="outbox-bar"></div>
 
 <nav class="tabs" id="tabs">
@@ -188,10 +206,19 @@
     </div>
     <div class="form-group"><label>Désignation *</label><input type="text" id="a-name" placeholder="Huile Elio 5L"></div>
     <div class="row2">
-      <div class="form-group"><label>Catégorie</label><input type="text" id="a-cat" list="cat-list" placeholder="Général"></div>
-      <div class="form-group"><label>Fournisseur</label><input type="text" id="a-supplier" placeholder="Grossiste"></div>
+      <div class="form-group">
+        <label>Catégorie (depuis le PC)</label>
+        <select id="a-cat"></select>
+      </div>
+      <div class="form-group">
+        <label>Fournisseur (depuis le PC)</label>
+        <select id="a-supplier"></select>
+      </div>
     </div>
-    <datalist id="cat-list"></datalist>
+    <div class="row2" style="margin-bottom:8px">
+      <button class="btn btn-ghost btn-sm" style="width:100%" onclick="addCategoryPrompt()">➕ إضافة تصنيف</button>
+      <button class="btn btn-ghost btn-sm" style="width:100%" onclick="addSupplierPrompt()">➕ إضافة مورد جديد</button>
+    </div>
     <div class="row3">
       <div class="form-group"><label>Qté *</label><input type="number" id="a-qty" value="1" min="1" step="1" inputmode="numeric" oninput="updateAchatPreview()"></div>
       <div class="form-group"><label>PA HT *</label><input type="number" id="a-buy" value="0" step="0.5" inputmode="decimal" oninput="updateAchatPreview()"></div>
@@ -248,6 +275,15 @@
     <div class="muted" id="cap-state" style="margin-top:8px">—</div>
   </div>
   <div class="card">
+    <h3>🔗 Appairage avec le PC</h3>
+    <div id="pair-state" class="muted">—</div>
+    <div class="row2" style="margin-top:8px">
+      <button class="btn btn-primary btn-sm" style="width:100%" onclick="openPairingModal()">🔢 Saisir le code</button>
+      <button class="btn btn-ghost btn-sm" style="width:100%" onclick="openPairingScanner()">📷 Scanner le QR</button>
+    </div>
+    <div class="muted" style="margin-top:6px">Le PC affiche un code à 6 chiffres + un QR valables 5 minutes (SSK-PAIRING.json).</div>
+  </div>
+  <div class="card">
     <h3>🔐 Code PIN</h3>
     <div id="pin-state" class="muted">—</div>
     <div class="row2" style="margin-top:8px">
@@ -262,6 +298,7 @@
   <div class="card">
     <h3>ℹ️ Application</h3>
     <div class="muted" id="app-info">—</div>
+    <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:8px" onclick="openDebug()">🩺 Diagnostic / Débogage</button>
   </div>
 </div>
 
@@ -338,6 +375,38 @@
   </div>
 </div>
 
+<div class="modal-bg" id="modal-pair">
+  <div class="modal">
+    <h2>🔗 Appairer avec le PC</h2>
+    <div class="muted" style="margin-bottom:8px">
+      Sur le PC : Réglages → « Appairer un téléphone ». Saisissez le code à 6 chiffres
+      (ou scannez le QR). Le code expire après 5 minutes.
+    </div>
+    <div class="form-group">
+      <label>Code à 6 chiffres</label>
+      <input type="text" id="pair-code" inputmode="numeric" maxlength="6" placeholder="000000"
+             style="font-size:1.6rem;text-align:center;letter-spacing:10px;font-weight:900">
+    </div>
+    <input type="text" id="pair-scan-value" class="hidden" oninput="onPairScan()" autocomplete="off">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-pair')">Annuler</button>
+      <button class="btn btn-ok" onclick="pairWithCode()">✅ Valider</button>
+    </div>
+    <button class="btn btn-primary btn-sm" style="width:100%;margin-top:8px" onclick="openPairingScanner()">📷 Scanner le QR du PC</button>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-debug">
+  <div class="modal" style="max-width:520px">
+    <h2>🩺 Diagnostic</h2>
+    <div class="debug-pre" id="debug-body">—</div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-debug')">Fermer</button>
+      <button class="btn btn-primary" onclick="copyDebug()">📋 Copier</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="modal-detail">
   <div class="modal">
     <h2 id="detail-title">Détail</h2>
@@ -372,9 +441,21 @@
 'use strict';
 
 const PINNED_ORIGIN = 'https://scavatore16.github.io/SSK-POS-PWA/';
+const PWA_VERSION = '8.1.7';           // identique à version-pc.json et au cache Sw.js
 const LIVE_FILE = 'SSK-POS-LIVE.json';
 const ACHATS_FILE = 'SSK-ACHATS-MOBILE.json';
 const CREDIT_FILE = 'SSK-CREDIT-MOBILE.json';
+const ACK_FILE = 'SSK-ACK.json';
+const PAIRING_FILE = 'SSK-PAIRING.json';
+const PAIRING_ACK_FILE = 'SSK-PAIRING-ACK.json';
+const PING_FILE = 'SSK-PING.json';
+const PONG_FILE = 'SSK-PONG.json';
+const DB_FILE = 'database.db';
+
+const LIVE_STALE_MS = 5 * 60 * 1000;   // données PC considérées périmées après 5 min
+const POLL_MS = 5000;                  // lecture LIVE toutes les 5 s
+const HB_MS = 5000;                    // PING écrit toutes les 5 s
+const PONG_FRESH_MS = 15000;           // PONG valide 15 s
 
 const K = {
   products: 'ssk_mobile_v6_products',
@@ -388,7 +469,16 @@ const K = {
   pinOn: 'ssk_mobile_pin_enabled',
   folder: 'ssk_mobile_sync_folder_name',
   lastSync: 'ssk_mobile_last_sync',
-  live: 'ssk_mobile_v9_live_cache'
+  live: 'ssk_mobile_v9_live_cache',
+  device: 'ssk_mobile_v9_device_id',
+  pairing: 'ssk_mobile_v9_pairing',
+  ackedIds: 'ssk_mobile_v9_acked_ids',
+  paidIds: 'ssk_mobile_v9_paid_ids',
+  ackedLedger: 'ssk_mobile_v9_acked_ledger',
+  sessionUntil: 'ssk_mobile_session_until',
+  localCats: 'ssk_mobile_v9_local_categories',
+  localSuppliers: 'ssk_mobile_v9_local_suppliers',
+  ackSeen: 'ssk_mobile_v9_ack_seen'
 };
 const DB_NAME = 'SSK_MOBILE_SYNC_DB';
 const STORE = 'handles';
@@ -415,6 +505,22 @@ let lastSyncAt = localStorage.getItem(K.lastSync) || null;
 let historyRange = 'today';
 let dashData = null;
 let alertsData = null;
+let dataSource = '';              // 'live' | 'db' | 'cache' | ''
+let liveUpdatedAt = '';           // meta.updated_at (ou lastUpdate)
+let liveBytes = 0;                // taille du dernier fichier lu
+let liveReadAt = 0;               // heure locale de la dernière lecture LIVE réussie
+let dbFallbackAt = 0;             // dernière lecture database.db
+let hbTimer = null;
+let hbBusy = false;
+let pongInfo = null;              // dernier SSK-PONG.json
+let pongAt = 0;                   // heure locale de réception du PONG
+let pairing = null;               // appairage validé avec le PC
+let pairingRequiredSeen = false;  // un SSK-PAIRING.json existe
+let payBusy = false;
+let lastAckStamp = '';
+let ackedIds = [];
+let paidIds = [];
+let ackedLedger = [];
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -551,6 +657,63 @@ function cacheFile(name, data){
   try { localStorage.setItem('ssk_file_' + name, JSON.stringify(data)); } catch(e){}
 }
 
+/* Récupère un File à partir du handle de dossier.
+   FileSystemDirectoryHandle n'expose PAS getFile() : il faut passer par
+   getFileHandle(name) puis handle.getFile(). Cette fonction absorbe les 2 formes
+   (vraie API + objet factice utilisé par les tests). */
+async function dirGetFile(name){
+  if (!syncDirHandle) throw new Error('no-folder');
+  if (typeof syncDirHandle.getFile === 'function') {
+    try { return await syncDirHandle.getFile(name); } catch(e){ /* continue */ }
+  }
+  const fh = await syncDirHandle.getFileHandle(name, { create: false });
+  return await fh.getFile();
+}
+
+async function dirGetFileHandle(name, create){
+  if (!syncDirHandle) throw new Error('no-folder');
+  return await syncDirHandle.getFileHandle(name, { create: !!create });
+}
+
+async function dirWriteText(name, text){
+  const fh = await dirGetFileHandle(name, true);
+  const w = await fh.createWritable();
+  await w.write(text);
+  await w.close();
+}
+
+async function dirWrite(name, data){
+  if (!syncDirHandle) return false;
+  const state = await queryPerm(syncDirHandle);
+  permState = state;
+  if (state !== 'granted') return false;
+  try { await dirWriteText(name, JSON.stringify(data, null, 2)); return true; }
+  catch(e){ return false; }
+}
+
+async function readSyncText(name){
+  if (!syncDirHandle) return null;
+  const state = await queryPerm(syncDirHandle);
+  permState = state;
+  if (state !== 'granted') return null;
+  try {
+    const f = await dirGetFile(name);
+    const text = await f.text();
+    return text || null;
+  } catch(e){ return null; }
+}
+
+async function readSync(name){
+  const text = await readSyncText(name);
+  if (!text) return null;
+  try { return JSON.parse(text); } catch(e){ return null; }
+}
+
+async function fileExists(name){
+  if (!syncDirHandle) return false;
+  try { await dirGetFile(name); return true; } catch(e){ return false; }
+}
+
 async function writeVerified(name, data){
   if (!syncDirHandle) return { ok: false, reason: 'no-folder' };
   if (originLocked) return { ok: false, reason: 'origin' };
@@ -559,12 +722,9 @@ async function writeVerified(name, data){
   if (state !== 'granted') { showPermBanner(state); return { ok: false, reason: 'permission' }; }
   const text = JSON.stringify(data, null, 2);
   try {
-    const fh = await syncDirHandle.getFileHandle(name, { create: true });
-    const w = await fh.createWritable();
-    await w.write(text);
-    await w.close();
+    await dirWriteText(name, text);
     // Vérification réelle : relecture du fichier écrit
-    const back = await syncDirHandle.getFile(name);
+    const back = await dirGetFile(name);
     const check = await back.text();
     if (!check || check.length !== text.length) return { ok: false, reason: 'verify-size' };
     const parsed = JSON.parse(check);
@@ -575,23 +735,6 @@ async function writeVerified(name, data){
     log('ERREUR', 'Écriture impossible: ' + name + ' — ' + (e && e.message || e));
     return { ok: false, reason: 'write-error', error: String(e && e.message || e) };
   }
-}
-
-async function readSync(name){
-  if (!syncDirHandle) return null;
-  const state = await queryPerm(syncDirHandle);
-  permState = state;
-  if (state !== 'granted') return null;
-  try {
-    const fh = await syncDirHandle.getFile(name);
-    const text = await fh.text();
-    return text ? JSON.parse(text) : null;
-  } catch(e){ return null; }
-}
-
-async function fileExists(name){
-  if (!syncDirHandle) return false;
-  try { await syncDirHandle.getFile(name); return true; } catch(e){ return false; }
 }
 
 /* ---------------- outbox ---------------- */
@@ -617,6 +760,12 @@ async function sendService(kind, file, payload, label){
     setStatus('⛔ عنوان غير معتمد — الإرسال ممنوع', 'error');
     log('SECURITE', 'Envoi bloqué (origine): ' + label);
     return { ok: false, reason: 'origin' };
+  }
+  if (pairingRequiredSeen && !isPaired()) {
+    setStatus('🔗 الحاسوب يطلب ربطًا أولًا — أدخل الكود من الإعدادات', 'error');
+    log('SECURITE', 'Envoi bloqué (appairage requis): ' + label);
+    openPairingModal();
+    return { ok: false, reason: 'pairing' };
   }
   if (!syncDirHandle) {
     outboxSet(kind, payload);
@@ -704,8 +853,10 @@ async function requestFolderPermission(){
   if (st === 'granted') {
     setStatus('✅ المجلد مسموح — جاهز للإرسال', 'ok');
     await loadLive(true);
+    await loadPairingFile();
     await flushOutbox(false);
     startPolling();
+    startHeartbeat();
   } else {
     setStatus('⚠️ لم يُمنح الإذن', 'error');
   }
@@ -720,7 +871,7 @@ async function bindFolder(){
     alert('هذا المتصفح لا يدعم اختيار مجلد (File System Access).\nاستعمل Chrome/Edge حديثًا.');
     return;
   }
-  if (localStorage.getItem(K.pinHash) && sessionStorage.getItem('ssk_unlocked') !== '1') {
+  if (localStorage.getItem(K.pinHash) && !isUnlocked()) {
     setStatus('🔒 افتح التطبيق بالـ PIN قبل تغيير المجلد', 'error');
     openLock();
     return;
@@ -743,8 +894,10 @@ async function bindFolder(){
     closeModal('modal-sync');
     renderSyncState();
     await loadLive(true);
+    await loadPairingFile();
     await flushOutbox(false);
     startPolling();
+    startHeartbeat();
     setStatus(st === 'granted' ? '✅ المجلد مربوط ومقفول' : '⚠️ المجلد مربوط — يجب السماح', st === 'granted' ? 'ok' : 'error');
     if (!pinEnabled()) {
       setStatus('🔐 المجلد مقفول — اضبط رمز PIN', 'info');
@@ -769,6 +922,7 @@ async function restoreHandle(){
   if (!localStorage.getItem(K.folder)) localStorage.setItem(K.folder, h.name || 'SSK-POS-DATA');
   permState = await queryPerm(h);
   renderSyncState();
+  renderPairState();
   showPermBanner(permState);
   log('SYNC', 'Handle restauré (' + permState + ')');
 }
@@ -780,8 +934,12 @@ function renderSyncState(){
     el.innerHTML = '⚠️ لا يوجد مجلد مربوط.<br>اختر <b>Documents/SSK-POS-DATA</b> مرة واحدة.';
   } else {
     const map = { granted: '✅ مسموح', prompt: '⚠️ يحتاج تأكيد', denied: '⛔ مرفوض', unknown: '؟' };
+    const srcMap = { live: 'LIVE (5 s)', cache: 'cache local (LIVE absent)', db: 'database.db', '': '—' };
+    const age = liveAgeMs();
     el.innerHTML = `📁 <b>${esc(folderName() || syncDirHandle.name)}</b><br>الإذن: <b>${map[permState] || permState}</b><br>
-      <span style="font-size:.62rem">آخر قراءة LIVE: ${lastSyncAt ? ftime(lastSyncAt) : '—'}</span>`;
+      المصدر: <b>${srcMap[dataSource] || dataSource || '—'}</b> • ${liveBytes ? Math.round(liveBytes / 1024) + ' Ko' : '—'}<br>
+      <span style="font-size:.62rem">LIVE: ${liveUpdatedAt ? ftime(liveUpdatedAt) + (age != null ? ' (' + Math.round(age / 1000) + ' s)' : '') : '—'}
+      • آخر قراءة: ${lastSyncAt ? ftime(lastSyncAt) : '—'}</span>`;
   }
   const cap = $('cap-state');
   if (cap) {
@@ -805,6 +963,38 @@ function openSyncModal(){
 }
 
 /* ---------------- LIVE ---------------- */
+function hydrateFromLive(data){
+  if (!data || typeof data !== 'object') return;
+  if (Array.isArray(data.stock) && data.stock.length) {
+    products = data.stock.map(s => ({
+      code: s.code_barres || s.code || '',
+      barcode: s.code_barres || '',
+      name: s.nom || s.name || '',
+      category: s.categorie || 'Général',
+      sellPrice: num(s.prix_vente),
+      buyPrice: num(s.prix_achat),
+      stock: num(s.quantite),
+      alertThreshold: num(s.seuil_alerte) || 5,
+      fournisseur: s.fournisseur || ''
+    }));
+  } else if (Array.isArray(data.products)) {
+    products = data.products.map(p => Object.assign({}, p));
+  }
+  if (Array.isArray(data.dettes) && data.dettes.length) {
+    customers = data.dettes.map(d => ({
+      id: d.client_id != null ? d.client_id : d.id,
+      name: d.nom || d.name || '',
+      phone: d.telephone || d.phone || '',
+      credit: num(d.montant != null ? d.montant : d.credit),
+      delai: num(d.delai),
+      creditStartDate: d.date_derniere_operation || d.creditStartDate || '',
+      creditLastSaleDate: d.date_derniere_operation || ''
+    }));
+  } else if (Array.isArray(data.customers)) {
+    customers = data.customers.map(c => Object.assign({}, c));
+  }
+}
+
 function loadLocal(){
   try { products = JSON.parse(localStorage.getItem(K.products) || '[]'); } catch(e){ products = []; }
   try { customers = JSON.parse(localStorage.getItem(K.customers) || '[]'); } catch(e){ customers = []; }
@@ -818,8 +1008,7 @@ function loadLocal(){
   // V9 : un cache LIVE présent doit hydrater les listes même si les clés séparées
   // sont vides (sinon stock / dettes / historique restent vides après mise à jour).
   if (live && typeof live === 'object') {
-    if ((!products.length) && Array.isArray(live.products)) products = live.products.map(p => Object.assign({}, p));
-    if ((!customers.length) && Array.isArray(live.customers)) customers = live.customers.map(c => Object.assign({}, c));
+    if (!products.length || !customers.length) hydrateFromLive(live);
   }
 }
 function saveLocal(){
@@ -841,27 +1030,115 @@ function prodGros(p){
   return v > 0 ? v : num(p.sellPrice);
 }
 
-async function loadLive(announce){
-  if (!syncDirHandle) { setStatus('⚠️ اربط مجلد SSK-POS-DATA أولًا', 'error'); return null; }
+async function readRawFile(name){
+  if (!syncDirHandle) return null;
   const st = await queryPerm(syncDirHandle);
   permState = st;
-  if (st !== 'granted') { showPermBanner(st); setStatus('⚠️ إذن المجلد مطلوب', 'error'); renderSyncState(); return null; }
+  if (st !== 'granted') return null;
+  try {
+    const f = await dirGetFile(name);
+    const text = await f.text();
+    const size = Number(f.size) || (text ? new Blob([text]).size : 0);
+    return { text: text || '', size: size, lastModified: Number(f.lastModified) || 0 };
+  } catch(e){ return null; }
+}
+
+function liveStamp(){
+  if (!live) return '';
+  return String((live.meta && live.meta.updated_at) || live.lastUpdate || liveAt || '');
+}
+function liveAgeMs(){
+  const s = liveUpdatedAt || liveStamp();
+  if (!s) return null;
+  const t = new Date(s).getTime();
+  if (!isFinite(t)) return null;
+  const age = Date.now() - t;
+  return age < 0 ? 0 : age;
+}
+function renderStaleBanner(){
+  const el = $('stale-banner');
+  if (!el) return;
+  if (!live) { el.classList.add('hidden'); return; }
+  const age = liveAgeMs();
+  if (age == null) { el.classList.add('hidden'); return; }
+  if (age <= LIVE_STALE_MS) { el.classList.add('hidden'); return; }
+  const min = Math.floor(age / 60000);
+  el.innerHTML = `⚠️ بيانات الحاسوب قديمة: آخر تحديث منذ <b>${min} دقيقة</b> (${ftime(liveUpdatedAt)})<br>
+    <span style="font-size:.62rem">الحاسوب مغلق أو Syncthing متوقف — لا تُعتمد الأرقام كنهائية.</span>`;
+  el.classList.remove('hidden');
+}
+
+async function dbFallbackInfo(){
+  // Repli autorisé : la base du PC est présente mais le LIVE manque.
+  // On NE calcule RIEN depuis database.db (lecture seule, pas de SQLite ici) :
+  // on prouve seulement que les données PC existent et on garde le dernier cache.
+  try {
+    const f = await dirGetFile(DB_FILE);
+    if (!f) return null;
+    dbFallbackAt = Date.now();
+    return { size: Number(f.size) || 0, lastModified: Number(f.lastModified) || 0 };
+  } catch(e){ return null; }
+}
+
+async function loadLive(announce){
+  if (!syncDirHandle) {
+    setStatus('⚠️ اربط مجلد SSK-POS-DATA أولًا', 'error');
+    setConn('off', '⚪ غير مربوط بالحاسوب');
+    return null;
+  }
+  const st = await queryPerm(syncDirHandle);
+  permState = st;
+  if (st !== 'granted') {
+    showPermBanner(st); setStatus('⚠️ إذن المجلد مطلوب', 'error');
+    setConn('warn', '⚠️ إذن المجلد مطلوب');
+    renderSyncState(); return null;
+  }
   if (announce) setStatus('⏳ قراءة SSK-POS-LIVE…', 'info');
-  const data = await readSync(LIVE_FILE);
-  if (!data) { setStatus('⏳ لا يوجد LIVE بعد — انتظر الحاسوب', 'info'); return null; }
+  const raw = await readRawFile(LIVE_FILE);
+  let data = null;
+  if (raw && raw.text) { try { data = JSON.parse(raw.text); } catch(e){ data = null; } }
+
+  if (!data) {
+    // Pas de LIVE lisible : on garde le cache (jamais 0.00) et on sonde database.db.
+    const db = await dbFallbackInfo();
+    dataSource = (live && typeof live === 'object') ? 'cache' : '';
+    liveBytes = 0;
+    renderStaleBanner();
+    if (db) {
+      setStatus('🟠 SSK-POS-LIVE غير متوفر — قاعدة database.db موجودة (' + Math.round(db.size / 1024) + ' Ko). في انتظار نشر الحاسوب.', 'info');
+    } else {
+      setStatus('⏳ لا يوجد LIVE بعد — انتظر الحاسوب', 'info');
+    }
+    setConn('warn', '🟠 بيانات محفوظة — LIVE غير مقروء');
+    renderSyncState();
+    return null;
+  }
+
   live = data;
-  products = Array.isArray(data.products) ? data.products.map(p => Object.assign({}, p)) : products;
-  customers = Array.isArray(data.customers) ? data.customers.map(c => Object.assign({}, c)) : customers;
-  lastSyncAt = new Date().toISOString();
-  localStorage.setItem(K.lastSync, lastSyncAt);
+  liveBytes = raw.size;
+  dataSource = 'live';
+  liveAt = new Date().toISOString();
+  liveUpdatedAt = liveStamp();
+  dbFallbackAt = 0;
+
+  // V2 : listes principales dans stock / dettes ; V1 (legacy) : products / customers.
+  hydrateFromLive(data);
+  lastSyncAt = liveAt;
+  liveReadAt = Date.now();
+  try { localStorage.setItem(K.lastSync, lastSyncAt); localStorage.setItem(K.live, JSON.stringify(live)); } catch(e){}
   saveLocal();
   try { buildDash(); buildAlerts(); } catch(e){ console.warn('derive', e); }
   fillCategories();
+  fillSuppliers();
   renderAll();
-  await checkCreditConsumed();
+  renderStaleBanner();
+  await checkAck();
   await checkAchatsConsumed();
-  setStatus('🟢 متصل — آخر قراءة: ' + new Date(lastSyncAt).toLocaleTimeString('fr-FR'), 'ok');
+  await checkCreditConsumed();
+  setStatus('🟢 قراءة LIVE: ' + new Date(lastSyncAt).toLocaleTimeString('fr-FR') + ' • ' + Math.round(raw.size / 1024) + ' Ko', 'ok');
   renderSyncState();
+  updateConn();
+  appInfo();
   return data;
 }
 
@@ -885,35 +1162,412 @@ async function checkCreditConsumed(){
   if (!msg || !Array.isArray(msg.payments) || !msg.payments.length) return;
   const still = await fileExists(CREDIT_FILE);
   if (still) return;
-  // Le PC a consommé le fichier : les règlements ne seront plus renvoyés.
+  // Fichier consommé par le PC : on ne le renverra pas tel quel.
+  // Les règlements restent « en attente » tant que l'ACK explicite n'arrive pas.
   try { localStorage.removeItem('ssk_file_' + CREDIT_FILE); } catch(e){}
   const ob = loadOutbox();
   const unwritten = !!(ob.credit && !ob.credit.writtenAt);
   if (unwritten) {
-    // Un règlement plus récent n'a pas encore été écrit : on le garde.
     log('SYNC', 'Fichier crédit consommé — un règlement reste en attente locale');
   } else {
     outboxClear('credit');
-    log('SYNC', 'Fichier crédit consommé par le PC');
+    log('SYNC', 'Fichier crédit consommé par le PC (attente ACK)');
   }
-  const before = creditPending.length;
-  creditPending = creditPending.filter(p => !String(p.status || '').startsWith('أُرسل'));
-  if (creditPending.length !== before) saveLocal();
   renderCredit();
+}
+
+/* ---------------- ACK explicite du PC (SSK-ACK.json) ---------------- */
+function loadAckState(){
+  const arr = (key) => { try { const a = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(a) ? a : []; } catch(e){ return []; } };
+  ackedIds = arr(K.ackedIds);
+  ackedLedger = arr(K.ackedLedger);
+  paidIds = arr(K.paidIds);
+}
+function saveAckState(){
+  try { localStorage.setItem(K.ackedIds, JSON.stringify(ackedIds.slice(-200))); } catch(e){}
+  try { localStorage.setItem(K.ackedLedger, JSON.stringify(ackedLedger.slice(-300))); } catch(e){}
+  try { localStorage.setItem(K.paidIds, JSON.stringify(paidIds.slice(-300))); } catch(e){}
+}
+function ackEntryIds(entry){
+  const ids = Array.isArray(entry && entry.ids) ? entry.ids.map(String).filter(Boolean) : [];
+  return ids;
+}
+function applyAckEntry(entry, ids){
+  const fichier = String((entry && entry.fichier) || '');
+  let touched = false;
+  const idSet = new Set(ids);
+
+  // 1) Règlements acceptés : on retire l'attente et on applique le solde UNE fois.
+  const beforePending = creditPending.length;
+  const accepted = creditPending.filter(p => idSet.has(String(p.id)));
+  creditPending = creditPending.filter(p => !idSet.has(String(p.id)));
+  if (creditPending.length !== beforePending) touched = true;
+  for (const row of accepted) {
+    if (ackedLedger.some(l => String(l.id) === String(row.id))) continue;
+    const cust = customers.find(c => String(c.id) === String(row.customerId));
+    if (cust) {
+      cust.credit = Math.max(0, r2(num(cust.credit) - num(row.amount)));
+      touched = true;
+    }
+    ackedLedger.push({ id: String(row.id), customerId: row.customerId, amount: r2(row.amount), ts: new Date().toISOString() });
+  }
+
+  // 2) Purge du fichier crédit en cache / de la file d'envoi.
+  const msg = readCachedFile(CREDIT_FILE);
+  if (msg && Array.isArray(msg.payments)) {
+    const keep = msg.payments.filter(p => !idSet.has(String(p.id)));
+    if (keep.length !== msg.payments.length) {
+      if (keep.length) cacheFile(CREDIT_FILE, Object.assign({}, msg, { payments: keep }));
+      else { try { localStorage.removeItem('ssk_file_' + CREDIT_FILE); } catch(e){} }
+      touched = true;
+    }
+  }
+  const ob = loadOutbox();
+  if (ob.credit && ob.credit.payload && Array.isArray(ob.credit.payload.payments)) {
+    const keep = ob.credit.payload.payments.filter(p => !idSet.has(String(p.id)));
+    if (!keep.length) outboxClear('credit');
+    else if (keep.length !== ob.credit.payload.payments.length) {
+      ob.credit.payload.payments = keep; saveOutbox(ob); renderOutboxBar();
+    }
+  }
+
+  // 3) Achats acceptés : id du lot = payload.id.
+  if (ob.achats && ob.achats.payload && idSet.has(String(ob.achats.payload.id))) {
+    outboxClear('achats');
+    pendingBatch = null;
+    touched = true;
+    log('SYNC', 'Lot d\'achats accepté par le PC (ACK)');
+  } else if (fichier === ACHATS_FILE && idSet.size && ob.achats && ob.achats.payload
+             && (idSet.has(String(ob.achats.payload.id)) || idSet.has(String(ob.achats.payload.sentAt)))) {
+    outboxClear('achats');
+    pendingBatch = null;
+    touched = true;
+  }
+
+  if (touched) {
+    saveLocal();
+    renderCredit();
+    renderOutboxBar();
+    setStatus('✅ الحاسوب أكّد الاستلام — تم تحديث الدين', 'ok');
+  }
+  return touched;
+}
+async function checkAck(){
+  if (!syncDirHandle) return false;
+  const ack = await readSync(ACK_FILE);
+  if (!ack || typeof ack !== 'object') return false;
+  const entries = (Array.isArray(ack.acceptes) && ack.acceptes.length) ? ack.acceptes.slice() : [ack];
+  const seen = new Set(ackedIds.map(String));
+  let touched = false, fresh = 0;
+  for (const e of entries) {
+    const ids = ackEntryIds(e);
+    if (!ids.length) continue;
+    const stamp = String((e && e.horodatage) || '') + '|' + ids.join(',');
+    if (seen.has(stamp)) continue;
+    seen.add(stamp);
+    ackedIds.push(stamp);
+    fresh++;
+    if (applyAckEntry(e, ids)) touched = true;
+  }
+  if (fresh) {
+    saveAckState();
+    log('SYNC', 'ACK PC: ' + fresh + ' nouveau(x) lot(s) accepté(s)');
+  }
+  if (touched) { renderCredit(); renderOutboxBar(); }
+  return touched;
 }
 
 function startPolling(){
   if (pollTimer) return;
   pollTimer = setInterval(() => {
-    if (!document.hidden) loadLive(false).catch(() => {});
-  }, 15000);
+    if (!document.hidden && syncDirHandle) loadLive(false).catch(() => {});
+  }, POLL_MS);
+}
+
+/* ---------------- APPAIRAGE PC <-> TÉLÉPHONE ---------------- */
+function loadPairingState(){
+  try { pairing = JSON.parse(localStorage.getItem(K.pairing) || 'null'); } catch(e){ pairing = null; }
+  if (!pairing || !pairing.pc_id) pairing = null;
+  loadAckState();
+}
+function isPaired(){ return !!(pairing && pairing.pc_id); }
+function renderPairState(){
+  const el = $('pair-state');
+  if (!el) return;
+  if (isPaired()) {
+    el.innerHTML = `✅ Appairé au PC <b>${esc(pairing.pc_id)}</b>${pairing.shop ? ' — ' + esc(pairing.shop) : ''}<br>
+      Version PC: <b>${esc(pairing.version_exe || '?.?.?')}</b> • depuis ${pairing.paired_at ? ftime(pairing.paired_at) : '—'}
+      <br><span style="font-size:.62rem">Méthode: ${pairing.via === 'qr' ? 'QR' : 'fichier SSK-PAIRING.json'}</span>`;
+    return;
+  }
+  if (!syncDirHandle) {
+    el.innerHTML = '⚠️ اربط مجلد SSK-POS-DATA أولًا، ثم أدخل كود الحاسوب.';
+    return;
+  }
+  if (pairingRequiredSeen) {
+    el.innerHTML = '⏳ الحاسوب يطلب ربطًا — أدخل الكود المكوّن من 6 أرقام (صالح 5 دقائق).';
+  } else {
+    el.innerHTML = '⚪ غير مربوط. الربط مطلوب فقط عندما يعرض الحاسوب كودًا (Réglages → Appairer).';
+  }
+}
+async function loadPairingFile(){
+  if (!syncDirHandle) { pairingRequiredSeen = false; renderPairState(); return null; }
+  const p = await readSync(PAIRING_FILE);
+  if (!p) { pairingRequiredSeen = false; renderPairState(); return null; }
+  const exp = new Date(p.expires_at || 0).getTime();
+  pairingRequiredSeen = !exp || Date.now() <= exp;
+  renderPairState();
+  return p;
+}
+async function writePairingAck(){
+  const payload = {
+    t: 'ssk-pairing-ack',
+    code: pairing ? pairing.code : '',
+    pc_id: pairing ? pairing.pc_id : '',
+    device_id: deviceId(),
+    paired_at: new Date().toISOString(),
+    version: '9'
+  };
+  const ok = await dirWrite(PAIRING_ACK_FILE, payload);
+  if (ok) log('PAIRING', 'SSK-PAIRING-ACK.json écrit');
+  return ok;
+}
+function openPairingModal(){
+  if (!requirePin()) return;
+  $('pair-code').value = '';
+  $('pair-scan-value').value = '';
+  renderPairState();
+  openModal('modal-pair');
+}
+function openPairingScanner(){
+  if (!requirePin()) return;
+  openModal('modal-pair');
+  setTimeout(() => openScanner('pair-scan-value'), 150);
+}
+function onPairScan(){
+  const v = ($('pair-scan-value').value || '').trim();
+  if (!v) return;
+  let qr = null;
+  try { const o = JSON.parse(v); if (o && (o.t === 'ssk-pair' || o.code)) qr = o; } catch(e){}
+  const code = qr ? String(qr.code || '') : v.replace(/\D/g, '');
+  if (qr && qr.code) $('pair-code').value = String(qr.code).slice(0, 6);
+  pairWithCode(code, qr);
+}
+async function pairWithCode(explicitCode, qr){
+  const raw = explicitCode != null ? explicitCode : ($('pair-code').value || '');
+  const code = String(raw).replace(/\D/g, '').slice(0, 6);
+  if (!/^\d{6}$/.test(code)) { alert('⚠️ الكود يجب أن يكون 6 أرقام'); return; }
+  if (!requirePin()) return;
+  if (!syncDirHandle) { alert('⚠️ اربط مجلد SSK-POS-DATA أولًا'); return; }
+  const st = await queryPerm(syncDirHandle);
+  permState = st;
+  if (st !== 'granted') { alert('⚠️ إذن المجلد مطلوب — اضغط «إعادة السماح»'); return; }
+
+  const file = await readSync(PAIRING_FILE);
+  let pcId = qr && qr.pc ? String(qr.pc) : '';
+  let exp = qr && qr.exp ? Number(qr.exp) : 0;
+  if (file) {
+    if (String(file.code) !== code) {
+      alert('❌ الكود غير مطابق لما نشره الحاسوب. أعد المحاولة بالكود الظاهر على الشاشة.');
+      log('PAIRING', 'Code refusé (fichier différent)');
+      return;
+    }
+    exp = new Date(file.expires_at || 0).getTime() || exp;
+    pcId = String(file.pc_id || pcId || 'PC');
+  }
+  if (!file && !qr) {
+    alert('❌ لا يوجد SSK-PAIRING.json ولا QR.\nعلى الحاسوب: Réglages → « Appairer un téléphone ».');
+    return;
+  }
+  if (!(exp > Date.now())) {
+    alert('⏳ انتهت صلاحية الكود (5 دقائق). اطلب كودًا جديدًا من الحاسوب.');
+    log('PAIRING', 'Code expiré');
+    return;
+  }
+  pairing = {
+    pc_id: pcId || 'PC',
+    code: code,
+    paired_at: new Date().toISOString(),
+    expires_at: new Date(exp).toISOString(),
+    version_exe: (file && file.version_exe) || (qr && qr.v) || '?.?.?',
+    shop: (file && file.shop) || '',
+    via: file ? 'file' : 'qr'
+  };
+  try { localStorage.setItem(K.pairing, JSON.stringify(pairing)); } catch(e){}
+  await writePairingAck();
+  closeModal('modal-pair');
+  renderPairState();
+  appInfo();
+  setStatus('✅ تم الربط مع الحاسوب ' + pairing.pc_id, 'ok');
+  log('PAIRING', 'Appairé avec ' + pairing.pc_id + ' (' + pairing.via + ')');
+}
+
+/* ---------------- CONNEXION RÉELLE (PING / PONG) ---------------- */
+function deviceId(){
+  let d = null;
+  try { d = localStorage.getItem(K.device); } catch(e){}
+  if (!d) {
+    d = 'MOB-' + Math.random().toString(36).slice(2, 8).toUpperCase() + '-' + Date.now().toString(36).toUpperCase();
+    try { localStorage.setItem(K.device, d); } catch(e){}
+  }
+  return d;
+}
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+function setConn(state, text){
+  const pill = $('conn-pill');
+  if (pill) {
+    pill.classList.remove('on', 'warn', 'off');
+    if (state) pill.classList.add(state);
+  }
+  const t = $('conn-text');
+  if (t) t.textContent = text;
+}
+function updateConn(){
+  if (!syncDirHandle) { setConn('off', '⚪ غير مربوط بالحاسوب'); return; }
+  if (permState !== 'granted') { setConn('warn', '⚠️ إذن المجلد مطلوب'); return; }
+  const pongFresh = pongAt > 0 && (Date.now() - pongAt) < PONG_FRESH_MS;
+  const liveFresh = liveReadAt > 0 && (Date.now() - liveReadAt) < PONG_FRESH_MS && dataSource === 'live';
+  const age = liveAgeMs();
+  const stale = age != null && age > LIVE_STALE_MS;
+  if (pongFresh && liveFresh && !stale) {
+    setConn('on', '🟢 متصل بالحاسوب — V' + ((pongInfo && pongInfo.version_exe) || '?.?.?'));
+  } else if (pongFresh && stale) {
+    setConn('warn', '🟠 الحاسوب يرد لكن بيانات LIVE قديمة');
+  } else if (pongFresh) {
+    setConn('warn', '🟠 الحاسوب يرد — قراءة LIVE غير مؤكدة');
+  } else if (pongAt > 0) {
+    setConn('warn', '🟠 آخر رد من الحاسوب: ' + new Date(pongAt).toLocaleTimeString('fr-FR'));
+  } else {
+    setConn('off', '🔴 لا يوجد رد من الحاسوب (PONG)');
+  }
+}
+async function heartbeat(){
+  if (!syncDirHandle || hbBusy) { updateConn(); return; }
+  if (document.hidden) { updateConn(); return; }
+  hbBusy = true;
+  try {
+    const st = await queryPerm(syncDirHandle);
+    permState = st;
+    if (st !== 'granted') { updateConn(); return; }
+    const before = await readSync(PONG_FILE);
+    const beforeTime = (before && before.time) ? String(before.time) : '';
+    const nowIso = new Date().toISOString();
+    const ok = await dirWrite(PING_FILE, {
+      telephone_id: deviceId(),
+      time: nowIso,
+      sent_at: nowIso,
+      client: 'PWA',
+      version: '9'
+    });
+    if (!ok) { updateConn(); return; }
+    // Laisse au PC le temps de répondre (watcher PC = 2 s) — 3 tentatives.
+    let changed = false;
+    for (let i = 0; i < 3; i++) {
+      await sleep(900);
+      const cand = await readSync(PONG_FILE);
+      if (!cand || String(cand.telephone_id || '') !== deviceId()) continue;
+      const t = String(cand.time || '');
+      if (t && t !== beforeTime) {
+        pongInfo = cand;
+        pongAt = Date.now();
+        changed = true;
+        break;
+      }
+    }
+    if (!changed && beforeTime) {
+      // Aucun nouveau PONG : le dernier connu vieillit naturellement.
+      updateConn();
+    }
+    // ACK : le PC confirme les lots acceptés.
+    await checkAck();
+    updateConn();
+  } catch(e){
+    console.warn('heartbeat', e);
+    updateConn();
+  } finally {
+    hbBusy = false;
+  }
+}
+function startHeartbeat(){
+  if (hbTimer) return;
+  hbTimer = setInterval(() => { heartbeat().catch(() => {}); }, HB_MS);
+  heartbeat().catch(() => {});
+}
+
+/* ---------------- DÉBOGAGE ---------------- */
+async function openDebug(){
+  const lines = [];
+  const push = (k, v) => lines.push(k.padEnd(22, ' ') + ': ' + v);
+  push('Heure', new Date().toLocaleString('fr-FR'));
+  push('Origine', currentOrigin());
+  push('Origine autorisée', originLocked ? 'NON (envoi bloqué)' : 'OUI');
+  push('Version PWA', PWA_VERSION);
+  push('Service Worker', ('serviceWorker' in navigator) ? (navigator.serviceWorker.controller ? 'actif' : 'non contrôlé') : 'indisponible');
+  push('Handle présent', syncDirHandle ? 'OUI' : 'NON');
+  push('Dossier', folderName() || (syncDirHandle && syncDirHandle.name) || '—');
+  push('Permission', permState);
+  push('Source données', dataSource || '—');
+  push('LIVE taille', liveBytes ? Math.round(liveBytes / 1024) + ' Ko' : '—');
+  push('LIVE updated_at', liveUpdatedAt || '—');
+  const age = liveAgeMs();
+  push('LIVE âge', age == null ? '—' : Math.round(age / 1000) + ' s' + (age > LIVE_STALE_MS ? ' (PÉRIMÉ)' : ''));
+  push('LIVE checksum', (live && live.meta && live.meta.checksum) ? String(live.meta.checksum).slice(0, 16) + '…' : '—');
+  push('version_exe (LIVE)', (live && live.version_exe) || '?.?.?');
+  push('Dernière lecture', liveReadAt ? new Date(liveReadAt).toLocaleTimeString('fr-FR') : '—');
+  push('Fallback database.db', dbFallbackAt ? new Date(dbFallbackAt).toLocaleTimeString('fr-FR') : '—');
+  push('PING id', deviceId());
+  push('PONG reçu', pongAt ? new Date(pongAt).toLocaleTimeString('fr-FR') + ' (' + Math.round((Date.now() - pongAt) / 1000) + ' s)' : '—');
+  push('PONG version_exe', (pongInfo && pongInfo.version_exe) || '?.?.?');
+  push('PONG telephone_id', (pongInfo && pongInfo.telephone_id) || '—');
+  push('PONG live_updated_at', (pongInfo && pongInfo.live_updated_at) || '—');
+  push('Appairé', isPaired() ? ('OUI — ' + pairing.pc_id) : 'NON');
+  push('Pairing requis', pairingRequiredSeen ? 'OUI (fichier 5 min)' : 'NON');
+  const o = loadOutbox();
+  push('Outbox achats', o.achats ? (o.achats.writtenAt ? 'écrit' : 'non écrit') : '—');
+  push('Outbox crédit', o.credit ? (o.credit.writtenAt ? 'écrit' : 'non écrit') : '—');
+  push('Règlements en attente', creditPending.length);
+  push('ACK mémorisés', ackedIds.length + ' lot(s) / ' + ackedLedger.length + ' règlement(s)');
+  push('Produits / clients', products.length + ' / ' + customers.length);
+  push('Catégories / fournisseurs', categoriesFromLive().length + ' / ' + suppliersFromLive().length);
+  push('Boutique', (live && live.shop && live.shop.nom) || '—');
+  push('Dernières lignes journal', '');
+  journal.slice(0, 15).forEach(j => lines.push('  ' + ftime(j.ts) + ' [' + j.type + '] ' + j.message));
+  const box = $('debug-body');
+  if (box) box.textContent = lines.join('\n');
+  openModal('modal-debug');
+}
+function copyDebug(){
+  const box = $('debug-body');
+  const text = box ? box.textContent : '';
+  if (!text) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => setStatus('📋 Copié', 'ok')).catch(() => alert(text));
+  } else {
+    alert(text);
+  }
+}
+
+/* ---------------- SESSION (12 h, pas de verrou auto) ---------------- */
+function markUnlocked(){
+  try { sessionStorage.setItem('ssk_unlocked', '1'); } catch(e){}
+  try { localStorage.setItem(K.sessionUntil, String(Date.now() + 12 * 3600 * 1000)); } catch(e){}
+}
+function isUnlocked(){
+  try { if (sessionStorage.getItem('ssk_unlocked') === '1') return true; } catch(e){}
+  const until = Number(localStorage.getItem(K.sessionUntil) || 0);
+  return until > Date.now();
+}
+function clearSession(){
+  try { sessionStorage.removeItem('ssk_unlocked'); } catch(e){}
+  try { localStorage.removeItem(K.sessionUntil); } catch(e){}
 }
 
 /* ---------------- DASH / ALERTS ---------------- */
 function dashFromLive(){
   if (live && live.dashboardHT && live.dashboardHT.today) return live.dashboardHT;
+  const sales = Array.isArray(live && live.recentSales) ? live.recentSales : null;
+  if (!sales) return null;   // aucune donnée : on n'affiche pas 0.00
   // Repli : calcul depuis recentSales (PC 8.1.4 sans dashboardHT)
-  const sales = Array.isArray(live && live.recentSales) ? live.recentSales : [];
   const now = Date.now();
   const tKey = todayKey();
   const yKey = dayKey(new Date(now - 86400000));
@@ -940,21 +1594,45 @@ function dashFromLive(){
 
 function buildDash(){
   dashData = dashFromLive();
-  const cash = (live && live.cashBreakdown) || null;
+  const d = (live && live.dashboard) || null;   // KPI officiels LIVE v2 (jamais recalculés)
   const grid = $('dash-grid');
+  if (!grid) return;
   const periods = [['today', "Aujourd'hui"], ['yesterday', 'Hier'], ['week', '7 jours'], ['month', 'Mois']];
   grid.innerHTML = periods.map(([k, label]) => {
-    const p = dashData[k] || {};
-    const cls = num(p.margeHT) < 0 ? 'red' : 'green';
+    const p = (dashData && dashData[k]) ? dashData[k] : null;
+    let src = p;
+    let official = false;
+    if (k === 'today' && d) {
+      official = true;
+      src = {
+        caHT: num(d.ventes_jour),
+        margeHT: num(d.benefice_jour),
+        tickets: num(d.nb_factures_jour),
+        caTTC: p ? num(p.caTTC) : null,
+        margePct: p ? p.margePct : null
+      };
+    }
+    if (!src) {
+      return `<div class="kpi">
+        <div class="k">${label}</div>
+        <div class="v">—</div>
+        <div class="s">في انتظار بيانات الحاسوب</div>
+      </div>`;
+    }
+    const cls = num(src.margeHT) < 0 ? 'red' : 'green';
+    const pctTxt = (src.margePct == null) ? '' : ` • ${num(src.margePct).toFixed(2)}%`;
+    const ttcTxt = (src.caTTC == null) ? '' : ` • TTC ${money(src.caTTC)}`;
     return `<div class="kpi">
-      <div class="k">${label}</div>
-      <div class="v">${money(p.caHT)} <span style="font-size:.6rem;color:var(--muted)">HT</span></div>
-      <div class="s">Marge HT: <b class="${cls}">${money(p.margeHT)}</b> • ${num(p.margePct).toFixed(2)}%</div>
-      <div class="s">TTC ${money(p.caTTC)} • ${num(p.tickets)} ticket(s)</div>
+      <div class="k">${label}${official ? ' <span style="color:var(--gold)">●</span>' : ''}</div>
+      <div class="v">${money(src.caHT)} <span style="font-size:.6rem;color:var(--muted)">HT</span></div>
+      <div class="s">Marge HT: <b class="${cls}">${money(src.margeHT)}</b>${pctTxt}</div>
+      <div class="s">${num(src.tickets)} ticket(s)${ttcTxt}</div>
     </div>`;
   }).join('');
 
   const cg = $('cash-grid');
+  if (!cg) return;
+  const cash = (live && live.cashBreakdown) || null;
   if (cash) {
     const rows = [
       ['Espèces', cash.cash, 'green'],
@@ -965,6 +1643,14 @@ function buildDash(){
       ['Dépenses', cash.expenses, 'red'],
       ['Total ventes', cash.totalSales, ''],
       ['Net caisse', cash.netCash, 'green']
+    ];
+    cg.innerHTML = rows.map(([k, v, cls]) => `<div class="kpi"><div class="k">${k}</div><div class="v ${cls}">${money(v)}</div></div>`).join('');
+  } else if (d) {
+    const rows = [
+      ['Caisse actuelle', d.caisse_actuelle, 'green'],
+      ['Ventes du jour', d.ventes_jour, ''],
+      ['Achats du jour', d.achats_jour, 'orange'],
+      ['Dettes totales', d.dettes_total, 'red']
     ];
     cg.innerHTML = rows.map(([k, v, cls]) => `<div class="kpi"><div class="k">${k}</div><div class="v ${cls}">${money(v)}</div></div>`).join('');
   } else {
@@ -1160,19 +1846,88 @@ function openProductInfo(code){
 }
 
 /* ---------------- ACHAT ---------------- */
-function fillCategories(){
-  const list = (live && Array.isArray(live.categories) && live.categories.length)
-    ? live.categories
-    : products.map(p => ({ name: p.category })).filter(c => c.name);
-  const seen = new Set();
-  const names = [];
-  (list || []).forEach(c => {
-    const n = typeof c === 'string' ? c : (c && c.name);
-    if (!n || seen.has(n)) return;
-    seen.add(n); names.push(n);
+function localList(key){
+  try { const a = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(a) ? a : []; } catch(e){ return []; }
+}
+function localListAdd(key, value){
+  const n = String(value || '').trim();
+  if (!n) return false;
+  const list = localList(key);
+  if (list.indexOf(n) >= 0) return false;
+  list.push(n);
+  try { localStorage.setItem(key, JSON.stringify(list)); } catch(e){}
+  return true;
+}
+function uniqNames(arr){
+  const seen = new Set(); const out = [];
+  (arr || []).forEach(v => {
+    const n = typeof v === 'string' ? v : (v && (v.nom || v.name));
+    const s = String(n == null ? '' : n).trim();
+    if (!s || seen.has(s)) return;
+    seen.add(s); out.push(s);
   });
-  names.sort((a, b) => a.localeCompare(b));
-  $('cat-list').innerHTML = names.map(n => `<option value="${esc(n)}"></option>`).join('');
+  return out.sort((a, b) => a.localeCompare(b, 'fr'));
+}
+function categoriesFromLive(){
+  const fromLive = (live && Array.isArray(live.categories)) ? live.categories : [];
+  const fromStock = (live && Array.isArray(live.stock)) ? live.stock.map(s => s && s.categorie) : [];
+  const fromProds = products.map(p => p.category);
+  return uniqNames([].concat(fromLive, fromStock, fromProds, localList(K.localCats)));
+}
+function suppliersFromLive(){
+  const fromLive = (live && Array.isArray(live.fournisseurs)) ? live.fournisseurs : [];
+  const fromLegacy = (live && Array.isArray(live.suppliers)) ? live.suppliers : [];
+  const fromProds = products.map(p => p.fournisseur);
+  return uniqNames([].concat(fromLive, fromLegacy, fromProds, localList(K.localSuppliers)));
+}
+function setSelectOptions(selId, names, current){
+  const el = $(selId);
+  if (!el) return;
+  const prev = current != null ? String(current) : String(el.value || '');
+  el.innerHTML = '<option value="">— Choisir —</option>'
+    + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  if (prev) {
+    if (names.indexOf(prev) < 0) {
+      const o = document.createElement('option');
+      o.value = prev; o.textContent = prev;
+      el.appendChild(o);
+    }
+    el.value = prev;
+  }
+}
+function setSelectValue(selId, value){
+  const el = $(selId);
+  if (!el) return;
+  const v = String(value == null ? '' : value);
+  if (!v) { el.value = ''; return; }
+  if (!Array.prototype.some.call(el.options, o => o.value === v)) {
+    const o = document.createElement('option');
+    o.value = v; o.textContent = v;
+    el.appendChild(o);
+  }
+  el.value = v;
+}
+function fillCategories(){
+  setSelectOptions('a-cat', categoriesFromLive(), null);
+}
+function fillSuppliers(){
+  setSelectOptions('a-supplier', suppliersFromLive(), null);
+}
+function addCategoryPrompt(){
+  const v = prompt('➕ Nouvelle catégorie :');
+  if (!localListAdd(K.localCats, v)) { if (String(v || '').trim()) setSelectValue('a-cat', String(v).trim()); return; }
+  fillCategories();
+  setSelectValue('a-cat', String(v).trim());
+  log('ACHATS', 'Catégorie locale ajoutée: ' + String(v).trim());
+  setStatus('✅ تصنيف محلي مُضاف', 'ok');
+}
+function addSupplierPrompt(){
+  const v = prompt('➕ Nouveau fournisseur :');
+  if (!localListAdd(K.localSuppliers, v)) { if (String(v || '').trim()) setSelectValue('a-supplier', String(v).trim()); return; }
+  fillSuppliers();
+  setSelectValue('a-supplier', String(v).trim());
+  log('ACHATS', 'Fournisseur local ajouté: ' + String(v).trim());
+  setStatus('✅ مورد محلي مُضاف', 'ok');
 }
 
 function onAchatCode(){
@@ -1181,8 +1936,8 @@ function onAchatCode(){
   const p = products.find(x => String(x.code || '') === code || String(x.barcode || '') === code);
   if (!p) { $('a-stock').value = '—'; return; }
   $('a-name').value = p.name || '';
-  $('a-cat').value = p.category || 'Général';
-  $('a-supplier').value = p.fournisseur || '';
+  setSelectValue('a-cat', p.category || 'Général');
+  setSelectValue('a-supplier', p.fournisseur || '');
   $('a-buy').value = num(p.buyPrice);
   $('a-vat').value = num(p.vatRate) || 19;
   $('a-sell').value = num(p.sellPrice);
@@ -1298,6 +2053,7 @@ async function sendAchats(){
   };
   const res = await sendService('achats', ACHATS_FILE, payload, 'المشتريات');
   log('ACHATS', 'Lot ' + payload.id + ' — ' + payload.articles.length + ' article(s) — ' + (res.ok ? 'écrit+vérifié' : 'en attente (' + res.reason + ')'));
+  if (!res.ok && (res.reason === 'pairing' || res.reason === 'origin')) return;
   if (res.ok) {
     achatsList = [];
     saveLocal();
@@ -1324,7 +2080,8 @@ function renderCredit(){
   let list = debtors();
   if (q) list = list.filter(c => String(c.name || '').toLowerCase().includes(q) || String(c.phone || '').includes(q));
   const total = list.reduce((a, c) => a + num(c.credit), 0);
-  $('c-total').textContent = money(total);
+  const hasServerData = !!(live && (Array.isArray(live.dettes) || Array.isArray(live.customers)));
+  $('c-total').textContent = (hasServerData || list.length) ? money(total) : '—';
   $('credit-list').innerHTML = list.length ? list.map(c => {
     const late = isOverdue(c);
     const extra = late ? (daysSince(c.creditStartDate) - num(c.delai)) : 0;
@@ -1412,7 +2169,22 @@ function statementFor(id){
   shareText(statementText(c), c.phone);
 }
 
+function recentDuplicatePayment(customerId, amount){
+  const AMT_EPS = 0.009;
+  const WIN = 60 * 1000;
+  const now = Date.now();
+  const same = (p) => String(p.customerId) === String(customerId)
+    && Math.abs(num(p.amount) - num(amount)) <= AMT_EPS
+    && (now - new Date(p.date || 0).getTime()) < WIN;
+  return creditPending.some(same) || ackedLedger.some(same) || paidIds.some(same);
+}
+function markPaid(entry){
+  paidIds.push({ id: String(entry.id), customerId: entry.customerId, amount: r2(entry.amount), date: entry.date });
+  saveAckState();
+}
+
 async function confirmPay(){
+  if (payBusy) return;
   const c = customers.find(x => Number(x.id) === Number(payId));
   if (!c) { closeModal('modal-pay'); return; }
   const debt = num(c.credit);
@@ -1420,6 +2192,12 @@ async function confirmPay(){
   if (!(amount > 0)) { alert('⚠️ المبلغ غير صحيح'); return; }
   if (originLocked) { alert('⛔ عنوان غير معتمد — لا يمكن الإرسال'); return; }
   if (!requirePin()) return;
+  if (recentDuplicatePayment(c.id, amount)) {
+    alert('⛔ تسديد مطابق (نفس العميل ونفس المبلغ) أُرسل قبل أقل من دقيقة.\nانتظر تأكيد الحاسوب (SSK-ACK.json) قبل إعادة المحاولة.');
+    log('SECURITE', 'Double paiement bloqué: ' + (c.name || c.id) + ' — ' + r2(amount));
+    return;
+  }
+  payBusy = true;
   const entry = {
     id: 'P-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
     customerId: c.id,
@@ -1431,46 +2209,52 @@ async function confirmPay(){
     date: new Date().toISOString(),
     source: 'MOBILE'
   };
-  // Fichier cumulatif : on ne perd jamais un paiement non consommé par le PC.
-  const prev = readCachedFile(CREDIT_FILE);
-  const payments = (prev && Array.isArray(prev.payments)) ? prev.payments.slice() : [];
-  // V9 : récupère aussi les règlements encore dans la file d'attente (jamais écrasés).
-  const ob = loadOutbox();
-  if (ob.credit && ob.credit.payload && Array.isArray(ob.credit.payload.payments)) {
-    for (const p of ob.credit.payload.payments) {
-      if (!payments.some(x => String(x.id) === String(p.id))) payments.push(p);
+  try {
+    // Fichier cumulatif : on ne perd jamais un paiement non consommé par le PC.
+    const prev = readCachedFile(CREDIT_FILE);
+    const payments = (prev && Array.isArray(prev.payments)) ? prev.payments.slice() : [];
+    // V9 : récupère aussi les règlements encore dans la file d'attente (jamais écrasés).
+    const ob = loadOutbox();
+    if (ob.credit && ob.credit.payload && Array.isArray(ob.credit.payload.payments)) {
+      for (const p of ob.credit.payload.payments) {
+        if (!payments.some(x => String(x.id) === String(p.id))) payments.push(p);
+      }
     }
-  }
-  if (!payments.some(p => String(p.id) === String(entry.id))) payments.push(entry);
-  const payload = { version: 'SSK-POS-V9-CREDIT', sentAt: new Date().toISOString(), id: 'CRD-' + Date.now(), source: 'MOBILE', payments: payments };
-  const res = await sendService('credit', CREDIT_FILE, payload, 'التسديد');
-  if (!res.ok) {
-    // On garde la trace locale « en attente » sans toucher au solde du client.
-    creditPending.push({ id: entry.id, customerId: entry.customerId, customerName: entry.customerName, amount: entry.amount, date: entry.date, status: 'في الانتظار (' + res.reason + ')' });
+    if (!payments.some(p => String(p.id) === String(entry.id))) payments.push(entry);
+    const payload = { version: 'SSK-POS-V9-CREDIT', sentAt: new Date().toISOString(), id: 'CRD-' + Date.now(), source: 'MOBILE', payments: payments };
+    const res = await sendService('credit', CREDIT_FILE, payload, 'التسديد');
+    if (!res.ok && (res.reason === 'pairing' || res.reason === 'origin')) { closeModal('modal-pay'); return; }
+    markPaid(entry);
+    if (!res.ok) {
+      // On garde la trace locale « en attente » sans toucher au solde du client.
+      creditPending.push({ id: entry.id, customerId: entry.customerId, customerName: entry.customerName, amount: entry.amount, date: entry.date, status: 'في الانتظار (' + res.reason + ')' });
+      saveLocal();
+      renderCredit();
+      closeModal('modal-pay');
+      setStatus('⏳ التسديد في الانتظار — لم يُخصم أي دين', 'error');
+      return;
+    }
+    creditPending.push({ id: entry.id, customerId: entry.customerId, customerName: entry.customerName, amount: entry.amount, date: entry.date, status: 'أُرسل — في انتظار الحاسوب' });
     saveLocal();
-    renderCredit();
+    log('REGLEMENT', `Règlement ${entry.customerName}: ${entry.amount.toFixed(2)} DZD — envoyé (reste PC: ${entry.remaining.toFixed(2)})`, entry);
     closeModal('modal-pay');
-    setStatus('⏳ التسديد في الانتظار — لم يُخصم أي دين', 'error');
-    return;
+    renderCredit();
+    setStatus('✅ التسديد أُرسل — ينتظر موافقة الحاسوب', 'ok');
+    // وصل بعد الإرسال
+    const receipt = [
+      '✅ SSK-POS — Reçu de règlement',
+      'Client : ' + entry.customerName,
+      'Montant reçu : ' + money(entry.amount),
+      'Dette avant : ' + money(entry.debtBefore),
+      'Reste estimé : ' + money(entry.remaining),
+      'Date : ' + new Date().toLocaleString('fr-FR'),
+      '',
+      '⏳ Envoyé au PC — sera validé par le commerçant (Accepter).'
+    ].join('\n');
+    shareText(receipt, c.phone);
+  } finally {
+    payBusy = false;
   }
-  creditPending.push({ id: entry.id, customerId: entry.customerId, customerName: entry.customerName, amount: entry.amount, date: entry.date, status: 'أُرسل — في انتظار الحاسوب' });
-  saveLocal();
-  log('REGLEMENT', `Règlement ${entry.customerName}: ${entry.amount.toFixed(2)} DZD — envoyé (reste PC: ${entry.remaining.toFixed(2)})`, entry);
-  closeModal('modal-pay');
-  renderCredit();
-  setStatus('✅ التسديد أُرسل — ينتظر موافقة الحاسوب', 'ok');
-  // وصل بعد الإرسال
-  const receipt = [
-    '✅ SSK-POS — Reçu de règlement',
-    'Client : ' + entry.customerName,
-    'Montant reçu : ' + money(entry.amount),
-    'Dette avant : ' + money(entry.debtBefore),
-    'Reste estimé : ' + money(entry.remaining),
-    'Date : ' + new Date().toLocaleString('fr-FR'),
-    '',
-    '⏳ Envoyé au PC — sera validé par le commerçant (Accepter).'
-  ].join('\n');
-  shareText(receipt, c.phone);
 }
 
 function sendStatement(){
@@ -1511,11 +2295,11 @@ function requirePin(){
     openPinSetup();
     return false;
   }
-  if (sessionStorage.getItem('ssk_unlocked') !== '1') { openLock(); return false; }
+  if (!isUnlocked()) { openLock(); return false; }
   return true;
 }
 function openPinSetup(){
-  if (pinEnabled() && sessionStorage.getItem('ssk_unlocked') !== '1') { openLock(); return; }
+  if (pinEnabled() && !isUnlocked()) { openLock(); return; }
   $('pin-new').value = ''; $('pin-confirm').value = '';
   openModal('modal-pin-setup');
 }
@@ -1526,7 +2310,7 @@ async function savePin(){
   if (pin !== conf) { alert('⚠️ Les deux PIN ne correspondent pas'); return; }
   localStorage.setItem(K.pinHash, await hashPin(pin));
   localStorage.setItem(K.pinOn, '1');
-  sessionStorage.setItem('ssk_unlocked', '1');
+  markUnlocked();
   log('SECURITE', 'PIN activé/changé');
   closeModal('modal-pin-setup');
   renderPinState();
@@ -1535,7 +2319,7 @@ async function savePin(){
 function renderPinState(){
   const el = $('pin-state');
   if (el) el.innerHTML = pinEnabled()
-    ? '✅ PIN actif sur cet appareil. Il sera demandé à chaque ouverture et après 10 min en arrière-plan.'
+    ? '✅ PIN actif sur cet appareil. Demandé à l\'ouverture ; session conservée 12 h (verrouillage manuel 🔒).'
     : '⚠️ لا يوجد PIN. الإرسال وربط المجلد يتطلبان PIN — اضبطه الآن.';
 }
 function askPin(title){
@@ -1559,7 +2343,7 @@ function openLock(){
 }
 function lockApp(){
   if (!pinEnabled()) { openPinSetup(); return; }
-  sessionStorage.removeItem('ssk_unlocked');
+  clearSession();
   openLock();
 }
 function pinKey(d){
@@ -1586,12 +2370,13 @@ async function unlockApp(){
     return;
   }
   const mode = window.__pinMode;
-  sessionStorage.setItem('ssk_unlocked', '1');
+  markUnlocked();
   $('lock-screen').classList.remove('active');
   if (mode === 'confirm' && window.__pinResolve) { const r = window.__pinResolve; window.__pinResolve = null; r(true); }
   log('SECURITE', 'Déverrouillé');
   if (!live) await loadLive(false);
   await flushOutbox(false);
+  if (syncDirHandle) { startPolling(); startHeartbeat(); await loadPairingFile(); }
 }
 
 /* ---------------- SCANNER ---------------- */
@@ -1645,61 +2430,85 @@ function switchView(name, btn){
   if (name === 'dash') renderDash();
   if (name === 'history') renderHistory();
   if (name === 'stock') renderStock();
-  if (name === 'achat') { fillCategories(); renderAchatList(); updateAchatPreview(); }
+  if (name === 'achat') { fillCategories(); fillSuppliers(); renderAchatList(); updateAchatPreview(); }
   if (name === 'credit') renderCredit();
-  if (name === 'settings') { renderSyncState(); renderJournal(); renderPinState(); }
+  if (name === 'settings') { renderSyncState(); renderJournal(); renderPinState(); renderPairState(); }
 }
 
 /* ---------------- BOOT ---------------- */
 function appInfo(){
   const el = $('app-info');
   if (!el) return;
-  el.innerHTML = `Version <b>V9</b> • origine: <b>${esc(currentOrigin())}</b><br>
-    Fichier unique — transport: dossier local (File System Access).<br>
-    ${live && live.lastUpdate ? 'LIVE PC: ' + ftime(live.lastUpdate) : 'Aucun LIVE reçu'}`;
+  el.innerHTML = `Version <b>${esc(PWA_VERSION)}</b> • origine: <b>${esc(currentOrigin())}</b><br>
+    Transport: dossier local (File System Access) + Syncthing.<br>
+    ${liveUpdatedAt ? 'LIVE PC: ' + ftime(liveUpdatedAt) : 'Aucun LIVE reçu'}
+    ${dataSource ? ' • source: <b>' + esc(dataSource) + '</b>' : ''}
+    ${isPaired() ? ' • appairé: <b>' + esc(pairing.pc_id) + '</b>' : ''}`;
+}
+
+function registerServiceWorker(){
+  if (!('serviceWorker' in navigator)) return;
+  if (!/^https?:$/.test(location.protocol)) return;
+  navigator.serviceWorker.register('./Sw.js').then(() => {
+    log('SYNC', 'Service Worker enregistré (offline)');
+  }).catch(e => log('ERREUR', 'Service Worker: ' + (e && e.message || e)));
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
   loadLocal();
   loadJournal();
+  loadPairingState();
   checkOrigin();
+  registerServiceWorker();
   renderSyncState();
   renderPinState();
+  renderPairState();
   renderAll();
   appInfo();
+  setConn('off', '⚪ غير مربوط بالحاسوب');
   if (navigator.storage && navigator.storage.persist) { try { await navigator.storage.persist(); } catch(e){} }
 
   await restoreHandle();
   if (permState === 'granted') {
     await loadLive(false);
+    await loadPairingFile();
     await flushOutbox(false);
     startPolling();
+    startHeartbeat();
+  } else if (syncDirHandle) {
+    await loadPairingFile();
   }
 
-  // PIN obligatoire : proposé immédiatement s'il n'existe pas, demandé sinon
+  // PIN obligatoire : proposé immédiatement s'il n'existe pas, demandé sinon.
+  // Session conservée 12 h — pas de verrouillage automatique.
   if (!pinEnabled()) {
     setTimeout(() => { if (!pinEnabled()) { setStatus('🔐 اضبط رمز PIN لحماية التطبيق', 'info'); openPinSetup(); } }, 600);
-  } else if (sessionStorage.getItem('ssk_unlocked') !== '1') {
+  } else if (!isUnlocked()) {
     openLock();
   }
 
   const splash = $('splash');
   setTimeout(() => { if (splash) splash.style.display = 'none'; }, 900);
 
-  let hiddenAt = 0;
   document.addEventListener('visibilitychange', async () => {
-    if (document.hidden) { hiddenAt = Date.now(); return; }
-    if (hiddenAt && Date.now() - hiddenAt > 10 * 60 * 1000 && pinEnabled()) {
-      sessionStorage.removeItem('ssk_unlocked');
-      openLock();
-    }
+    if (document.hidden) return;
     if (syncDirHandle) {
       await loadLive(false);
+      await loadPairingFile();
       await flushOutbox(false);
       startPolling();
+      startHeartbeat();
     }
+    updateConn();
   });
   window.addEventListener('online', () => { if (syncDirHandle) loadLive(false).catch(() => {}); });
+
+  // Rafraîchit l'état de connexion même sans nouvelle lecture (PONG qui expire).
+  setInterval(() => {
+    updateConn();
+    renderStaleBanner();
+    if (syncDirHandle && !document.hidden) loadPairingFile().catch(() => {});
+  }, 3000);
 });
 </script>
 </body>
