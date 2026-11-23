@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="SSK POS">
-<link rel="manifest" href="./manifest.webmanifest">
+<link rel="manifest" href="./manifest.json">
 <link rel="icon" type="image/png" sizes="64x64" href="./favicon-64.png">
 <link rel="apple-touch-icon" sizes="192x192" href="./icon-192.png">
 <title>SSK-POS Mobile V9</title>
@@ -126,6 +126,7 @@
 
 <div class="tools">
   <button class="tool" id="btn-sync" onclick="openSyncModal()">📁 Dossier</button>
+  <button class="tool" id="btn-pair" onclick="openPairingModal()">🔗 Appairer</button>
   <button class="tool" id="btn-alerts" onclick="openAlerts('seuil')">🔔 Alertes</button>
   <button class="tool" id="btn-lock" onclick="lockApp()">🔒</button>
 </div>
@@ -298,7 +299,8 @@
   <div class="card">
     <h3>ℹ️ Application</h3>
     <div class="muted" id="app-info">—</div>
-    <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:8px" onclick="openDebug()">🩺 Diagnostic / Débogage</button>
+    <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:8px" onclick="forcePwaUpdate()">🔄 Forcer la mise à jour</button>
+    <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:6px" onclick="openDebug()">🩺 Diagnostic / Débogage</button>
   </div>
 </div>
 
@@ -441,7 +443,7 @@
 'use strict';
 
 const PINNED_ORIGIN = 'https://scavatore16.github.io/SSK-POS-PWA/';
-const PWA_VERSION = '8.1.7';           // identique à version-pc.json et au cache Sw.js
+const PWA_VERSION = '8.1.8';           // identique à version-pc.json et au cache Sw.js
 const LIVE_FILE = 'SSK-POS-LIVE.json';
 const ACHATS_FILE = 'SSK-ACHATS-MOBILE.json';
 const CREDIT_FILE = 'SSK-CREDIT-MOBILE.json';
@@ -658,13 +660,13 @@ function cacheFile(name, data){
 }
 
 /* Récupère un File à partir du handle de dossier.
-   FileSystemDirectoryHandle n'expose PAS getFile() : il faut passer par
-   getFileHandle(name) puis handle.getFile(). Cette fonction absorbe les 2 formes
-   (vraie API + objet factice utilisé par les tests). */
+   FileSystemDirectoryHandle n'expose PAS de lecture directe de fichier : il faut
+   passer par getFileHandle(name) puis handle.getFile(). C'est l'unique chemin
+   utilisé (l'ancien appel direct provoquait « getFile is not a function »). */
 async function dirGetFile(name){
   if (!syncDirHandle) throw new Error('no-folder');
-  if (typeof syncDirHandle.getFile === 'function') {
-    try { return await syncDirHandle.getFile(name); } catch(e){ /* continue */ }
+  if (typeof syncDirHandle.getFileHandle !== 'function') {
+    throw new Error('handle-invalide: getFileHandle manquant — reconnectez le dossier');
   }
   const fh = await syncDirHandle.getFileHandle(name, { create: false });
   return await fh.getFile();
@@ -738,10 +740,38 @@ async function writeVerified(name, data){
 }
 
 /* ---------------- outbox ---------------- */
+const OUTBOX_KINDS = ['achats', 'credit'];
+function outboxFileOf(kind){ return kind === 'achats' ? ACHATS_FILE : CREDIT_FILE; }
+function outboxLabelOf(kind){ return kind === 'achats' ? 'مشتريات' : 'تسديدات'; }
+
+/* Source unique du compteur : on ignore et supprime les restes d'anciennes
+   versions (clés inconnues, payload vide/invalide) au lieu de les afficher. */
 function loadOutbox(){
-  try { return JSON.parse(localStorage.getItem(K.outbox) || '{}') || {}; } catch(e){ return {}; }
+  let raw = {};
+  try { raw = JSON.parse(localStorage.getItem(K.outbox) || '{}') || {}; } catch(e){ raw = {}; }
+  const clean = {};
+  let changed = false;
+  for (const kind of Object.keys(raw)) {
+    const item = raw[kind];
+    if (OUTBOX_KINDS.indexOf(kind) === -1) { changed = true; continue; }
+    if (!item || !item.payload || typeof item.payload !== 'object') { changed = true; continue; }
+    if (kind === 'achats' && !Array.isArray(item.payload.articles)) { changed = true; continue; }
+    if (kind === 'credit' && !Array.isArray(item.payload.payments)) { changed = true; continue; }
+    clean[kind] = item;
+  }
+  if (changed) { try { localStorage.setItem(K.outbox, JSON.stringify(clean)); } catch(e){} }
+  return clean;
 }
 function saveOutbox(o){ try { localStorage.setItem(K.outbox, JSON.stringify(o)); } catch(e){} }
+function outboxCounts(){
+  const o = loadOutbox();
+  const kinds = Object.keys(o);
+  return {
+    pending: kinds.filter(k => !o[k].writtenAt),
+    waiting: kinds.filter(k => !!o[k].writtenAt),
+    total: kinds.length
+  };
+}
 function outboxSet(kind, payload){
   const o = loadOutbox();
   o[kind] = { payload: payload, queuedAt: new Date().toISOString(), writtenAt: null };
@@ -800,38 +830,102 @@ function cleanupSentFiles(kind, payload){
 }
 
 async function flushOutbox(manual){
+  if (manual) log('SYNC', 'Réessayer l\'envoi demandé manuellement');
+  if (!syncDirHandle) {
+    if (manual) {
+      log('ERREUR', 'Réessayer impossible: aucun dossier SSK-POS-DATA lié');
+      setStatus('⚠️ اربط مجلد SSK-POS-DATA أولًا ثم أعد المحاولة', 'error');
+    }
+    renderOutboxBar();
+    return 0;
+  }
   const o = loadOutbox();
-  let sent = 0;
+  let sent = 0, cleaned = 0, waiting = 0, failed = 0;
   for (const kind of Object.keys(o)) {
     const item = o[kind];
-    if (!item || !item.payload || item.writtenAt) continue;
-    const file = kind === 'achats' ? ACHATS_FILE : CREDIT_FILE;
-    const label = kind === 'achats' ? 'المشتريات' : 'التسديدات';
+    if (!item || !item.payload) continue;
+    const file = outboxFileOf(kind);
+    const label = outboxLabelOf(kind);
+
+    // Entrée déjà écrite : si le PC l'a consommée (fichier disparu), on nettoie.
+    if (item.writtenAt) {
+      const still = await fileExists(file);
+      if (!still) {
+        outboxClear(kind);
+        cleaned++;
+        log('SYNC', 'File consommée par le PC — retirée du journal: ' + file);
+      } else {
+        waiting++;
+        log('SYNC', 'Déjà envoyé, en attente du PC: ' + file);
+      }
+      continue;
+    }
+
+    // Entrée jamais écrite : on retente réellement l'écriture vérifiée.
     const res = await writeVerified(file, item.payload);
     if (res.ok) {
-      item.writtenAt = new Date().toISOString();
-      saveOutbox(o);
+      const o2 = loadOutbox();
+      if (o2[kind]) { o2[kind].writtenAt = new Date().toISOString(); saveOutbox(o2); }
+      cleanupSentFiles(kind, item.payload);
       sent++;
-      log('SYNC', 'Renvoi réussi: ' + file);
+      log('SYNC', 'Renvoi réussi: ' + file + ' (' + label + ')');
+    } else {
+      failed++;
+      log('ERREUR', 'Renvoi échoué ' + label + ': ' + res.reason + (res.error ? ' — ' + res.error : ''));
     }
   }
   if (manual) {
-    if (sent) setStatus('✅ تم إرسال ' + sent + ' ملف', 'ok');
-    else setStatus('ℹ️ لا يوجد ما يُرسل الآن', 'info');
+    const parts = [];
+    if (sent) parts.push(sent + ' envoyé(s)');
+    if (cleaned) parts.push(cleaned + ' nettoyé(s)');
+    if (waiting) parts.push(waiting + ' en attente du PC');
+    if (failed) parts.push(failed + ' échec(s)');
+    if (!parts.length) {
+      log('SYNC', 'Réessayer: rien à envoyer');
+      setStatus('ℹ️ لا يوجد ما يُرسل الآن', 'info');
+    } else if (failed) {
+      setStatus('⚠️ إعادة المحاولة: ' + parts.join(' • '), 'error');
+    } else {
+      setStatus('✅ إعادة المحاولة: ' + parts.join(' • '), 'ok');
+    }
   }
   renderOutboxBar();
   return sent;
 }
 
-function renderOutboxBar(){
+/* Nettoie les entrées « envoyées » dont le fichier a déjà été consommé par le PC.
+   Appelé après chaque lecture LIVE pour que le compteur ne reste jamais bloqué. */
+async function cleanupConsumedOutbox(){
+  if (!syncDirHandle) return 0;
   const o = loadOutbox();
-  const pending = Object.keys(o).filter(k => o[k] && !o[k].writtenAt);
-  const waiting = Object.keys(o).filter(k => o[k] && o[k].writtenAt);
-  if (!pending.length && !waiting.length) { showBanner('outbox-bar', ''); $('btn-sync') && $('btn-sync').classList.remove('ok'); return; }
+  let cleaned = 0;
+  for (const kind of Object.keys(o)) {
+    const item = o[kind];
+    if (!item || !item.writtenAt) continue;
+    const file = outboxFileOf(kind);
+    if (!(await fileExists(file))) {
+      outboxClear(kind);
+      cleaned++;
+      log('SYNC', 'File consommée par le PC — nettoyée: ' + file);
+    }
+  }
+  return cleaned;
+}
+
+function renderOutboxBar(){
+  const c = outboxCounts();
+  if (!c.total) {
+    showBanner('outbox-bar', '');
+    const el = $('outbox-bar');
+    if (el) el.textContent = '';
+    $('btn-sync') && $('btn-sync').classList.remove('ok');
+    return;
+  }
   let html = '';
-  if (pending.length) html += `⏳ <b>غير مُرسل:</b> ${pending.length} ملف — ${pending.map(k => k === 'achats' ? 'مشتريات' : 'تسديدات').join(', ')}`;
-  if (waiting.length) html += (html ? '<br>' : '') + `📨 <b>أُرسل:</b> ${waiting.length} ملف في انتظار الحاسوب (Recevoir Mobile)`;
+  if (c.pending.length) html += `⏳ <b>غير مُرسل:</b> ${c.pending.length} ملف — ${c.pending.map(outboxLabelOf).join(', ')}`;
+  if (c.waiting.length) html += (html ? '<br>' : '') + `📨 <b>أُرسل:</b> ${c.waiting.length} ملف في انتظار الحاسوب (Recevoir Mobile)`;
   showBanner('outbox-bar', html);
+  $('btn-sync') && $('btn-sync').classList.add('ok');
 }
 
 /* ---------------- permissions UI ---------------- */
@@ -936,7 +1030,12 @@ function renderSyncState(){
     const map = { granted: '✅ مسموح', prompt: '⚠️ يحتاج تأكيد', denied: '⛔ مرفوض', unknown: '؟' };
     const srcMap = { live: 'LIVE (5 s)', cache: 'cache local (LIVE absent)', db: 'database.db', '': '—' };
     const age = liveAgeMs();
+    const liveOk = liveReadAt > 0 && (Date.now() - liveReadAt) < LIVE_STALE_MS && dataSource === 'live';
+    const liveBadge = liveOk
+      ? '🟢 <b>LIVE OK</b> — ' + new Date(liveReadAt).toLocaleTimeString('fr-FR')
+      : (liveUpdatedAt ? '🟠 LIVE قديم — ' + ftime(liveUpdatedAt) : '🔴 LIVE غير مقروء');
     el.innerHTML = `📁 <b>${esc(folderName() || syncDirHandle.name)}</b><br>الإذن: <b>${map[permState] || permState}</b><br>
+      ${liveBadge}<br>
       المصدر: <b>${srcMap[dataSource] || dataSource || '—'}</b> • ${liveBytes ? Math.round(liveBytes / 1024) + ' Ko' : '—'}<br>
       <span style="font-size:.62rem">LIVE: ${liveUpdatedAt ? ftime(liveUpdatedAt) + (age != null ? ' (' + Math.round(age / 1000) + ' s)' : '') : '—'}
       • آخر قراءة: ${lastSyncAt ? ftime(lastSyncAt) : '—'}</span>`;
@@ -1135,6 +1234,7 @@ async function loadLive(announce){
   await checkAck();
   await checkAchatsConsumed();
   await checkCreditConsumed();
+  await cleanupConsumedOutbox();
   setStatus('🟢 قراءة LIVE: ' + new Date(lastSyncAt).toLocaleTimeString('fr-FR') + ' • ' + Math.round(raw.size / 1024) + ' Ko', 'ok');
   renderSyncState();
   updateConn();
@@ -1333,14 +1433,16 @@ async function writePairingAck(){
   return ok;
 }
 function openPairingModal(){
-  if (!requirePin()) return;
+  // L'appairage doit rester accessible même si le PIN n'est pas encore créé :
+  // il faut de toute façon le code 6 chiffres du PC + l'accès au dossier.
+  if (pinEnabled() && !isUnlocked()) { openLock(); return; }
   $('pair-code').value = '';
   $('pair-scan-value').value = '';
   renderPairState();
   openModal('modal-pair');
 }
 function openPairingScanner(){
-  if (!requirePin()) return;
+  if (pinEnabled() && !isUnlocked()) { openLock(); return; }
   openModal('modal-pair');
   setTimeout(() => openScanner('pair-scan-value'), 150);
 }
@@ -1357,7 +1459,7 @@ async function pairWithCode(explicitCode, qr){
   const raw = explicitCode != null ? explicitCode : ($('pair-code').value || '');
   const code = String(raw).replace(/\D/g, '').slice(0, 6);
   if (!/^\d{6}$/.test(code)) { alert('⚠️ الكود يجب أن يكون 6 أرقام'); return; }
-  if (!requirePin()) return;
+  if (pinEnabled() && !isUnlocked()) { openLock(); return; }
   if (!syncDirHandle) { alert('⚠️ اربط مجلد SSK-POS-DATA أولًا'); return; }
   const st = await queryPerm(syncDirHandle);
   permState = st;
@@ -1426,17 +1528,23 @@ function updateConn(){
   if (!syncDirHandle) { setConn('off', '⚪ غير مربوط بالحاسوب'); return; }
   if (permState !== 'granted') { setConn('warn', '⚠️ إذن المجلد مطلوب'); return; }
   const pongFresh = pongAt > 0 && (Date.now() - pongAt) < PONG_FRESH_MS;
-  const liveFresh = liveReadAt > 0 && (Date.now() - liveReadAt) < PONG_FRESH_MS && dataSource === 'live';
+  const liveFresh = liveReadAt > 0 && (Date.now() - liveReadAt) < LIVE_STALE_MS && dataSource === 'live';
   const age = liveAgeMs();
   const stale = age != null && age > LIVE_STALE_MS;
+  const readTime = liveReadAt ? new Date(liveReadAt).toLocaleTimeString('fr-FR') : (lastSyncAt ? ftime(lastSyncAt) : '');
   if (pongFresh && liveFresh && !stale) {
     setConn('on', '🟢 متصل بالحاسوب — V' + ((pongInfo && pongInfo.version_exe) || '?.?.?'));
-  } else if (pongFresh && stale) {
-    setConn('warn', '🟠 الحاسوب يرد لكن بيانات LIVE قديمة');
+  } else if (liveFresh && !stale) {
+    // Le fichier LIVE est récent : l'état « LIVE OK » suffit, même sans PONG.
+    setConn('on', '🟢 LIVE OK — ' + readTime);
+  } else if (liveFresh && stale) {
+    setConn('warn', '🟠 LIVE قديم — آخر قراءة ' + readTime);
   } else if (pongFresh) {
     setConn('warn', '🟠 الحاسوب يرد — قراءة LIVE غير مؤكدة');
   } else if (pongAt > 0) {
     setConn('warn', '🟠 آخر رد من الحاسوب: ' + new Date(pongAt).toLocaleTimeString('fr-FR'));
+  } else if (liveReadAt > 0) {
+    setConn('warn', '🟠 LIVE قديم — آخر قراءة ' + readTime);
   } else {
     setConn('off', '🔴 لا يوجد رد من الحاسوب (PONG)');
   }
@@ -2449,9 +2557,49 @@ function appInfo(){
 function registerServiceWorker(){
   if (!('serviceWorker' in navigator)) return;
   if (!/^https?:$/.test(location.protocol)) return;
-  navigator.serviceWorker.register('./Sw.js').then(() => {
+  navigator.serviceWorker.register('./Sw.js').then((reg) => {
     log('SYNC', 'Service Worker enregistré (offline)');
+    // Nouvelle version détectée : on active immédiatement puis on recharge
+    // une seule fois (garde session pour éviter une boucle de rechargement).
+    reg.addEventListener('updatefound', () => {
+      const nw = reg.installing;
+      if (!nw) return;
+      nw.addEventListener('statechange', () => {
+        if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+          log('SYNC', 'Nouvelle version PWA installée — rechargement');
+          if (!sessionStorage.getItem('ssk_sw_reloaded')) {
+            sessionStorage.setItem('ssk_sw_reloaded', '1');
+            location.reload();
+          }
+        }
+      });
+    });
+    // Vérifie une mise à jour à chaque démarrage.
+    reg.update().catch(() => {});
   }).catch(e => log('ERREUR', 'Service Worker: ' + (e && e.message || e)));
+}
+
+/* Force le téléchargement de la dernière version : supprime le Service Worker
+   et les caches, puis recharge depuis le réseau. */
+async function forcePwaUpdate(){
+  const ok = window.confirm('🔄 تحديث التطبيق الآن؟\nسيتم حذف الكاش وإعادة التحميل من الشبكة.');
+  if (!ok) return;
+  try {
+    setStatus('⏳ تحديث التطبيق…', 'info');
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister().catch(() => false)));
+    }
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    log('SYNC', 'Mise à jour forcée — caches supprimés');
+  } catch(e){
+    log('ERREUR', 'Mise à jour forcée: ' + (e && e.message || e));
+  }
+  sessionStorage.removeItem('ssk_sw_reloaded');
+  setTimeout(() => location.reload(), 200);
 }
 
 window.addEventListener('DOMContentLoaded', async () => {

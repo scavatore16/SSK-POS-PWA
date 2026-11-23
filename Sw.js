@@ -1,6 +1,6 @@
 /* ==========================================================
    SSK-POS PWA — Service Worker (Phase 2)
-   Version de cache identique au PC : 8.1.7 (ssk-pos-pwa-8.1.7)
+   Version de cache identique au PC : 8.1.8 (ssk-pos-pwa-8.1.8)
    - Pré-cache de l'application (./ et ./index.html)
    - Cache runtime pour les CDN (html5-qrcode) et les images
    - Jamais de cache pour les fichiers de synchronisation SSK-*.json
@@ -8,11 +8,12 @@
    ========================================================== */
 'use strict';
 
-const SW_VERSION = '8.1.7';
+const SW_VERSION = '8.1.8';
 const CACHE_NAME = 'ssk-pos-pwa-' + SW_VERSION;
 const PRECACHE = [
   './',
   './index.html',
+  './manifest.json',
   './manifest.webmanifest',
   './icon-192.png',
   './icon-512.png',
