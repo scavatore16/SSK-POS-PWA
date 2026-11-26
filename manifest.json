@@ -1,26 +1,17 @@
 {
-  "name": "SSK-POS Mobile 8.1.9",
+  "name": "SSK POS - Caisse & Stock",
   "short_name": "SSK POS",
+  "description": "SSK POS - Caisse & Stock",
   "id": "./",
-  "version": "8.1.9",
-  "description": "SSK-POS Mobile — caisse, stock et crédits en lecture LIVE depuis le PC (source unique de vérité).",
-  "start_url": "./",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "display_override": [
-    "standalone",
-    "minimal-ui"
-  ],
   "orientation": "portrait",
-  "background_color": "#0c0e14",
-  "theme_color": "#0c0e14",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
   "lang": "fr",
   "dir": "ltr",
-  "categories": [
-    "business",
-    "finance",
-    "productivity"
-  ],
+  "categories": ["business", "finance", "productivity"],
   "icons": [
     {
       "src": "./icon-192.png",
@@ -40,5 +31,6 @@
       "type": "image/png",
       "purpose": "maskable"
     }
-  ]
-}\n
+  ],
+  "display_override": ["standalone", "minimal-ui"]
+}
