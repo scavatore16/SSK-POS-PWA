@@ -8,7 +8,7 @@
    ========================================================== */
 'use strict';
 
-const SW_VERSION = '8.1.9';
+const SW_VERSION = '8.2.0';
 const CACHE_NAME = 'ssk-pos-pwa-' + SW_VERSION;
 const PRECACHE = [
   './',
@@ -16,8 +16,8 @@ const PRECACHE = [
   './manifest.json',
   './manifest.webmanifest',
   './icon-192.png',
-  './icon-512.png',
-  './favicon-64.png'
+  './icon-512.png'
+  
 ];
 
 self.addEventListener('install', (event) => {
